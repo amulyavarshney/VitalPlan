@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     AZURE_OPENAI_EMBEDDING_MODEL: str = ""
     AZURE_OPENAI_TEMPERATURE: float = 0.1
     AZURE_OPENAI_MAX_TOKENS: int = 4000
+
+    # Groq
+    GROQ_API_KEY: str = ""
     
     # Azure Computer Vision
     AZURE_COMPUTER_VISION_ENDPOINT: str = ""

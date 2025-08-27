@@ -1,11 +1,13 @@
-import openai
+from openai import AzureOpenAI
+from groq import Groq
 import base64
 import io
 from PIL import Image
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 import logging
 import json
 from datetime import datetime, timezone
+from models.ai_provider import AIProvider
 
 from config import settings
 
@@ -13,15 +15,38 @@ logger = logging.getLogger(__name__)
 
 class AIService:
     """AI Service for nutrition analysis and diet plan generation"""
+
+    def __init__(self, provider: AIProvider = AIProvider.GROQ, **config):
+        self.provider = provider
+        self.config = config
+
+    def generate_chat_completion(self, messages: list, model: str, **kwargs) -> Dict[str, Any]:
+        """Generate chat completion using the configured provider"""
+        completion_kwargs = {
+            **self.config,
+            **kwargs
+        }
+        
+        return ChatCompletionFactory.create_completion(
+            provider=self.provider,
+            messages=messages,
+            model=model,
+            **completion_kwargs
+        )
+
+    # def chat(self, user_message: str, model: str, system_message: Optional[str] = None, **kwargs) -> str:
+    #     """Simple chat interface"""
+    #     messages = []
+        
+    #     if system_message:
+    #         messages.append({"role": "system", "content": system_message})
+        
+    #     messages.append({"role": "user", "content": user_message})
+        
+    #     response = self.generate_chat_completion(messages, model, **kwargs)
+    #     return response.get("content", "")
     
-    def __init__(self):
-        # Configure Azure OpenAI
-        openai.api_type = "azure"
-        openai.api_base = settings.AZURE_OPENAI_ENDPOINT
-        openai.api_version = settings.AZURE_OPENAI_API_VERSION
-        openai.api_key = settings.AZURE_OPENAI_API_KEY
-    
-    async def analyze_food_image(self, image_data: bytes) -> Dict[str, Any]:
+    async def analyze_food_image(self, image_data: bytes, **kwargs) -> Dict[str, Any]:
         """Analyze food image using Azure OpenAI Vision"""
         try:
             # Convert image to base64
@@ -71,28 +96,27 @@ class AIService:
             """
             
             # Call Azure OpenAI Vision API
-            response = await openai.ChatCompletion.acreate(
-                engine=settings.AZURE_OPENAI_MODEL,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": prompt},
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/jpeg;base64,{image_base64}"
+            response = self.generate_chat_completion(
+                    model=kwargs.get("model", settings.AZURE_OPENAI_MODEL),
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": [
+                                { "type": "text", "text": prompt },
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": f"data:image/jpeg;base64,{image_base64}"
+                                    }
                                 }
-                            }
-                        ]
-                    }
-                ],
-                max_tokens=settings.AZURE_OPENAI_MAX_TOKENS,
-                temperature=settings.AZURE_OPENAI_TEMPERATURE
-            )
+                            ]
+                        }
+                    ],
+                    max_tokens=kwargs.get("max_tokens", settings.AZURE_OPENAI_MAX_TOKENS),
+                    temperature=kwargs.get("temperature", settings.AZURE_OPENAI_TEMPERATURE)
+                )
             
-            # Parse the response
-            content = response.choices[0].message.content
+            content = response.get("content")
             
             try:
                 # Try to parse as JSON
@@ -110,7 +134,7 @@ class AIService:
             logger.error(f"Error analyzing food image: {str(e)}")
             raise e
     
-    async def generate_diet_plan(self, user_data: Dict[str, Any], goals: List[Dict[str, Any]]) -> Dict[str, Any]:
+    async def generate_diet_plan(self, user_data: Dict[str, Any], goals: List[Dict[str, Any]], **kwargs) -> Dict[str, Any]:
         """Generate personalized diet plan using AI"""
         try:
             # Prepare user context
@@ -180,14 +204,14 @@ class AIService:
             Include 4 meals (breakfast, lunch, dinner, snack) and 2-3 relevant supplements.
             """
             
-            response = await openai.ChatCompletion.acreate(
-                engine=settings.AZURE_OPENAI_MODEL,
+            response = self.generate_chat_completion(
+                model=kwargs.get("model", settings.AZURE_OPENAI_MODEL),
                 messages=[{"role": "user", "content": prompt}],
-                max_tokens=settings.AZURE_OPENAI_MAX_TOKENS,
-                temperature=settings.AZURE_OPENAI_TEMPERATURE
+                max_tokens=kwargs.get("max_tokens", settings.AZURE_OPENAI_MAX_TOKENS),
+                temperature=kwargs.get("temperature", settings.AZURE_OPENAI_TEMPERATURE)
             )
-            
-            content = response.choices[0].message.content
+
+            content = response.get("content")
             
             try:
                 diet_plan = json.loads(content)
@@ -220,14 +244,15 @@ class AIService:
             Return as a JSON array of strings.
             """
             
-            response = await openai.ChatCompletion.acreate(
-                engine=settings.AZURE_OPENAI_MODEL,
+            response = self.generate_chat_completion(
+                model=kwargs.get("model", settings.AZURE_OPENAI_MODEL),
                 messages=[{"role": "user", "content": prompt}],
-                max_tokens=200,
-                temperature=0.3
+                max_tokens=kwargs.get("max_tokens", settings.AZURE_OPENAI_MAX_TOKENS),
+                temperature=kwargs.get("temperature", settings.AZURE_OPENAI_TEMPERATURE)
             )
+
+            content = response.get("content")
             
-            content = response.choices[0].message.content
             insights = json.loads(content)
             
             return insights if isinstance(insights, list) else []
