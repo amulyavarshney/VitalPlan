@@ -19,6 +19,10 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     password: str
 
+class AdminCreate(UserBase):
+    password: str
+    is_admin: bool = True
+
 class UserUpdate(BaseModel):
     name: Optional[str] = None
     age: Optional[int] = None
@@ -35,6 +39,7 @@ class UserUpdate(BaseModel):
 class User(UserBase):
     id: int
     is_active: bool
+    is_admin: bool = False
     created_at: datetime
     updated_at: Optional[datetime] = None
     
@@ -51,3 +56,6 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     email: Optional[str] = None
+
+class SpoofRequest(BaseModel):
+    user_email: EmailStr

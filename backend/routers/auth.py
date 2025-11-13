@@ -37,7 +37,8 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
         allergies=user.allergies,
         avatar=user.avatar,
         bio=user.bio,
-        location=user.location
+        location=user.location,
+        is_admin=False  # Regular users are not admins
     )
     
     db.add(db_user)

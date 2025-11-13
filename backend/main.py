@@ -7,7 +7,7 @@ import os
 from typing import List, Optional
 import logging
 
-from routers import auth, users, goals, diet_plans, marketplace, scanner, orders
+from routers import auth, users, goals, diet_plans, marketplace, scanner, orders, admin
 from config import settings
 from services.database import engine, Base
 from services.ai_service import AIService
@@ -40,6 +40,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
+app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 app.include_router(users.router, prefix="/api/users", tags=["Users"])
 app.include_router(goals.router, prefix="/api/goals", tags=["Goals"])
 app.include_router(diet_plans.router, prefix="/api/diet-plans", tags=["Diet Plans"])
@@ -64,7 +65,7 @@ async def root():
 if __name__ == "__main__":
     uvicorn.run(
         "main:app",
-        host="0.0.0.0",
+        host="localhost",
         port=8000,
         reload=True,
         log_level="info"
