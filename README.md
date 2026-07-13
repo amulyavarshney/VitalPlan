@@ -90,6 +90,21 @@ A comprehensive web application that provides personalized diet plans, AI-powere
    uvicorn main:app --reload --host 0.0.0.0 --port 8000
    ```
 
+7. **(Optional) Run database migrations**:
+   ```bash
+   alembic upgrade head
+   ```
+
+8. **Run backend tests**:
+   ```bash
+   pytest -q
+   ```
+
+### Security notes
+- Set a strong `SECRET_KEY` (32+ chars) before production.
+- Set `ENVIRONMENT=production` to enforce secret validation.
+- Admin registration requires `X-Admin-Secret` matching `ADMIN_REGISTRATION_SECRET` (after the first bootstrap admin in development).
+
 ### Frontend Setup
 
 1. **Navigate to frontend**:

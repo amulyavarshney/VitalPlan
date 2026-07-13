@@ -103,7 +103,7 @@ async def update_diet_plan(
     if not plan:
         raise HTTPException(status_code=404, detail="Diet plan not found")
     
-    update_data = plan_update.dict(exclude_unset=True)
+    update_data = plan_update.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(plan, field, value)
     

@@ -1,7 +1,19 @@
 from pydantic_settings import BaseSettings
-from typing import List
+from pydantic import Field, field_validator, model_validator
+from typing import List, Optional
+
+WEAK_SECRET_KEYS = {
+    "",
+    "dev-only-change-me-in-production",
+    "your-secret-key-change-in-production",
+    "9bf75596f0523e3e29c582c64ef96c68bb77a3e3c45eb174f55fd2ec3b6fc48b",
+}
+
 
 class Settings(BaseSettings):
+    # Environment
+    ENVIRONMENT: str = "development"
+
     # API Settings
     API_V1_STR: str = "/api"
     PROJECT_NAME: str = "VitalPlan API"
@@ -10,6 +22,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "dev-only-change-me-in-production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    ADMIN_REGISTRATION_SECRET: str = ""
     
     # Database
     DATABASE_URL: str = "sqlite:///./vitalplan.db"
@@ -62,6 +75,24 @@ class Settings(BaseSettings):
     # External APIs
     NUTRITION_API_KEY: str = ""
     USDA_API_KEY: str = ""
+
+    @field_validator("ENVIRONMENT")
+    @classmethod
+    def normalize_environment(cls, value: str) -> str:
+        return value.lower().strip()
+
+    @model_validator(mode="after")
+    def validate_production_security(self) -> "Settings":
+        if self.ENVIRONMENT == "production":
+            if self.SECRET_KEY in WEAK_SECRET_KEYS or len(self.SECRET_KEY) < 32:
+                raise ValueError(
+                    "SECRET_KEY must be a strong unique value (32+ chars) when ENVIRONMENT=production"
+                )
+            if not self.ADMIN_REGISTRATION_SECRET or len(self.ADMIN_REGISTRATION_SECRET) < 16:
+                raise ValueError(
+                    "ADMIN_REGISTRATION_SECRET must be set (16+ chars) when ENVIRONMENT=production"
+                )
+        return self
     
     class Config:
         env_file = ".env"

@@ -28,7 +28,7 @@ async def create_goal(
     db: Session = Depends(get_db)
 ):
     """Create a new goal"""
-    db_goal = Goal(**goal.dict(), user_id=current_user.id)
+    db_goal = Goal(**goal.model_dump(), user_id=current_user.id)
     db.add(db_goal)
     db.commit()
     db.refresh(db_goal)
@@ -49,7 +49,7 @@ async def update_goal(
     if not goal:
         raise HTTPException(status_code=404, detail="Goal not found")
     
-    update_data = goal_update.dict(exclude_unset=True)
+    update_data = goal_update.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(goal, field, value)
     

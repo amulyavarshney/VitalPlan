@@ -1,6 +1,7 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from typing import List, Optional
 from datetime import datetime
+
 
 class UserBase(BaseModel):
     email: EmailStr
@@ -16,12 +17,15 @@ class UserBase(BaseModel):
     bio: Optional[str] = None
     location: Optional[str] = None
 
+
 class UserCreate(UserBase):
-    password: str
+    password: str = Field(min_length=6, max_length=128)
+
 
 class AdminCreate(UserBase):
-    password: str
+    password: str = Field(min_length=6, max_length=128)
     is_admin: bool = True
+
 
 class UserUpdate(BaseModel):
     name: Optional[str] = None
@@ -36,26 +40,31 @@ class UserUpdate(BaseModel):
     bio: Optional[str] = None
     location: Optional[str] = None
 
+
 class User(UserBase):
     id: int
     is_active: bool
     is_admin: bool = False
     created_at: datetime
     updated_at: Optional[datetime] = None
-    
+
     class Config:
         from_attributes = True
+
 
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
+
 class Token(BaseModel):
     access_token: str
     token_type: str
 
+
 class TokenData(BaseModel):
     email: Optional[str] = None
+
 
 class SpoofRequest(BaseModel):
     user_email: EmailStr

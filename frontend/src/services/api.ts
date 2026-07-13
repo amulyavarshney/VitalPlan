@@ -40,7 +40,10 @@ api.interceptors.response.use(
 
 export function getApiErrorMessage(error: unknown, fallback = 'Something went wrong'): string {
   if (axios.isAxiosError(error)) {
-    const detail = error.response?.data?.detail;
+    const data = error.response?.data;
+    const nested = data?.error;
+    if (typeof nested?.message === 'string') return nested.message;
+    const detail = data?.detail ?? nested?.detail;
     if (typeof detail === 'string') return detail;
     if (Array.isArray(detail)) {
       return detail.map((item) => item.msg || JSON.stringify(item)).join(', ');
