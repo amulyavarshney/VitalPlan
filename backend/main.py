@@ -8,7 +8,7 @@ import time
 import uvicorn
 import logging
 
-from routers import auth, users, goals, diet_plans, marketplace, scanner, orders, admin
+from routers import auth, users, goals, diet_plans, marketplace, scanner, orders, admin, webhooks
 from config import settings
 from services.database import engine, Base
 from services.storage_service import resolve_upload_path
@@ -116,6 +116,7 @@ app.include_router(diet_plans.router, prefix="/api/diet-plans", tags=["Diet Plan
 app.include_router(marketplace.router, prefix="/api/marketplace", tags=["Marketplace"])
 app.include_router(scanner.router, prefix="/api/scanner", tags=["Food Scanner"])
 app.include_router(orders.router, prefix="/api/orders", tags=["Orders"])
+app.include_router(webhooks.router, prefix="/api/webhooks", tags=["Webhooks"])
 
 
 @app.get("/api/uploads/{subdir}/{filename}")

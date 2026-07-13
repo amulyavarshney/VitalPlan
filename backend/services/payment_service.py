@@ -1,9 +1,13 @@
 """Payment processing with Stripe (when configured) or demo mode."""
 from __future__ import annotations
 
+import hashlib
+import hmac
+import json
 import logging
+import time
 import uuid
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 import httpx
 
@@ -14,6 +18,66 @@ logger = logging.getLogger(__name__)
 
 def payments_enabled() -> bool:
     return bool(settings.STRIPE_SECRET_KEY)
+
+
+def webhooks_enabled() -> bool:
+    return payments_enabled() and bool(settings.STRIPE_WEBHOOK_SECRET)
+
+
+def verify_stripe_signature(
+    payload: bytes,
+    signature_header: str,
+    *,
+    tolerance_seconds: int = 300,
+) -> bool:
+    """Verify Stripe-Signature header (HMAC SHA-256)."""
+    secret = settings.STRIPE_WEBHOOK_SECRET
+    if not secret or not signature_header:
+        return False
+
+    timestamp: Optional[str] = None
+    signatures: list[str] = []
+    for item in signature_header.split(","):
+        key, _, value = item.strip().partition("=")
+        if key == "t":
+            timestamp = value
+        elif key == "v1":
+            signatures.append(value)
+
+    if not timestamp or not signatures:
+        return False
+
+    try:
+        if abs(time.time() - int(timestamp)) > tolerance_seconds:
+            logger.warning("Stripe webhook timestamp outside tolerance")
+            return False
+    except ValueError:
+        return False
+
+    signed_payload = f"{timestamp}.{payload.decode('utf-8')}".encode("utf-8")
+    expected = hmac.new(secret.encode("utf-8"), signed_payload, hashlib.sha256).hexdigest()
+    return any(hmac.compare_digest(expected, candidate) for candidate in signatures)
+
+
+def parse_stripe_event(payload: bytes) -> Dict[str, Any]:
+    return json.loads(payload.decode("utf-8"))
+
+
+def extract_payment_intent_update(event: Dict[str, Any]) -> Optional[Tuple[str, str]]:
+    """Return (payment_intent_id, status) for handled event types, else None."""
+    event_type = event.get("type")
+    data_object = (event.get("data") or {}).get("object") or {}
+    intent_id = data_object.get("id")
+    if not intent_id:
+        return None
+
+    if event_type == "payment_intent.succeeded":
+        return intent_id, "succeeded"
+    if event_type == "payment_intent.payment_failed":
+        return intent_id, "failed"
+    if event_type == "payment_intent.processing":
+        return intent_id, "processing"
+    return None
 
 
 async def create_payment_intent(

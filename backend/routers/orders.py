@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
-from datetime import datetime, timezone
 
 from services.database import get_db
 from services.auth_service import get_current_user
 from services.payment_service import create_payment_intent, confirm_payment, payment_public_config
+from services.order_payment import apply_payment_result
 from models.user import User
 from models.order import Order
 from schemas.order import (
@@ -107,18 +107,16 @@ async def pay_order(
     try:
         result = await confirm_payment(intent_id)
     except Exception as exc:
-        order.payment_status = "failed"
-        db.commit()
+        apply_payment_result(db, order, status="failed", provider=order.payment_provider or "demo")
         raise HTTPException(status_code=402, detail=str(exc))
 
-    order.payment_status = "paid"
     order.payment_intent_id = result["payment_intent_id"]
-    order.payment_provider = result["provider"]
-    order.paid_at = datetime.now(timezone.utc)
-    order.status = "processing"
-    db.commit()
-    db.refresh(order)
-    return order
+    return apply_payment_result(
+        db,
+        order,
+        status=result["status"] if result["status"] in {"succeeded", "processing"} else "succeeded",
+        provider=result["provider"],
+    )
 
 
 @router.get("/", response_model=List[OrderSchema])

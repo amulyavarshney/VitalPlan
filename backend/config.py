@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     # Payments (optional — demo mode when unset)
     STRIPE_SECRET_KEY: str = ""
     STRIPE_PUBLISHABLE_KEY: str = ""
+    STRIPE_WEBHOOK_SECRET: str = ""
     FRONTEND_URL: str = "http://localhost:5173"
 
     # Email / SMTP (console fallback when unset)

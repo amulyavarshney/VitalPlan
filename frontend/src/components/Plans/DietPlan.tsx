@@ -251,9 +251,52 @@ export default function DietPlan({ goals, user, onAddToCart }: DietPlanProps) {
   };
 
   useEffect(() => {
-    if (goals.length > 0) {
-      generatePlan();
-    }
+    if (goals.length === 0) return;
+
+    let cancelled = false;
+
+    const loadSavedOrGenerate = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const plans = await dietPlansAPI.getPlans();
+        if (cancelled) return;
+        if (plans.length > 0) {
+          setDietPlan(normalizeDietPlan(plans[0]));
+          setIsLoading(false);
+          return;
+        }
+      } catch {
+        // Fall through to generate when history fetch fails
+      }
+
+      if (cancelled) return;
+      try {
+        const plan = await dietPlansAPI.generatePlan({
+          goals: goals.map((goal) => ({
+            id: goal.id,
+            type: goal.type,
+            title: goal.title,
+            description: goal.description,
+            priority: goal.priority,
+          })),
+        });
+        if (!cancelled) setDietPlan(normalizeDietPlan(plan));
+      } catch (err) {
+        console.error(err);
+        if (!cancelled) {
+          setError(getApiErrorMessage(err, 'Using offline sample plan'));
+          setDietPlan(generateMockDietPlan(goals, user));
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+
+    loadSavedOrGenerate();
+    return () => {
+      cancelled = true;
+    };
   }, [goals]);
 
   const handleAddAllToCart = () => {
