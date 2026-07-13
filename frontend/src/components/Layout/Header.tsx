@@ -1,5 +1,6 @@
 import React from 'react';
-import { Menu, User, ShoppingCart, Heart, Scan, Store, X } from 'lucide-react';
+import { Menu, User, ShoppingCart, Heart, Scan, Store, X, LogIn, LogOut } from 'lucide-react';
+import { useAuth } from '../../hooks/useAuth';
 
 interface HeaderProps {
   currentView: string;
@@ -9,6 +10,7 @@ interface HeaderProps {
 
 export default function Header({ currentView, onViewChange, cartItemsCount = 0 }: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
+  const { isAuthenticated, logout, user } = useAuth();
 
   const navItems = [
     { key: 'home', label: 'Home', icon: Heart },
@@ -37,7 +39,7 @@ export default function Header({ currentView, onViewChange, cartItemsCount = 0 }
             </div>
 
             {/* Desktop Navigation */}
-            <nav className="hidden lg:flex space-x-8">
+            <nav className="hidden lg:flex items-center space-x-6">
               {navItems.map((item) => {
                 const Icon = item.icon;
                 return (
@@ -60,6 +62,27 @@ export default function Header({ currentView, onViewChange, cartItemsCount = 0 }
                   </button>
                 );
               })}
+              {isAuthenticated ? (
+                <button
+                  onClick={() => {
+                    logout();
+                    onViewChange('home');
+                  }}
+                  className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-600 hover:text-emerald-600"
+                  title={user?.email}
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Sign out
+                </button>
+              ) : (
+                <button
+                  onClick={() => onViewChange('auth')}
+                  className="inline-flex items-center px-3 py-2 text-sm font-medium text-emerald-600 bg-emerald-50 rounded-md"
+                >
+                  <LogIn className="w-4 h-4 mr-2" />
+                  Sign in
+                </button>
+              )}
             </nav>
 
             {/* Mobile menu button */}
@@ -115,6 +138,30 @@ export default function Header({ currentView, onViewChange, cartItemsCount = 0 }
                   </button>
                 );
               })}
+              <button
+                onClick={() => {
+                  if (isAuthenticated) {
+                    logout();
+                    onViewChange('home');
+                  } else {
+                    onViewChange('auth');
+                  }
+                  setIsMenuOpen(false);
+                }}
+                className="w-full flex items-center px-6 py-4 text-base font-medium text-gray-600 hover:text-emerald-600 hover:bg-gray-50"
+              >
+                {isAuthenticated ? (
+                  <>
+                    <LogOut className="w-6 h-6 mr-4" />
+                    Sign out
+                  </>
+                ) : (
+                  <>
+                    <LogIn className="w-6 h-6 mr-4" />
+                    Sign in
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Clock, Users, ChefHat, ShoppingCart, Loader, RefreshCw, Download, Info, X, Eye } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Clock, ChefHat, ShoppingCart, Loader, RefreshCw, Download, X, Eye } from 'lucide-react';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
-import type { DietPlan as DietPlanType, Meal, Supplement, Goal, User, NutritionDetails } from '../../types';
+import type { DietPlan as DietPlanType, Meal, Supplement, Goal, User } from '../../types';
+import { dietPlansAPI, getApiErrorMessage } from '../../services/api';
 
 interface DietPlanProps {
   goals: Goal[];
@@ -10,7 +10,33 @@ interface DietPlanProps {
   onAddToCart: (items: any[]) => void;
 }
 
-// Enhanced mock AI-generated content with detailed nutrition
+function normalizeDietPlan(plan: DietPlanType): DietPlanType {
+  return {
+    ...plan,
+    meals: (plan.meals || []).map((meal) => ({
+      ...meal,
+      prepTime: meal.prepTime ?? (meal as Meal & { prep_time?: number }).prep_time ?? 10,
+      nutritionDetails: meal.nutritionDetails
+        ? {
+            ...meal.nutritionDetails,
+            saturatedFat: meal.nutritionDetails.saturatedFat ?? 0,
+            transFat: meal.nutritionDetails.transFat ?? 0,
+          }
+        : undefined,
+    })),
+    supplements: plan.supplements || [],
+    goals: plan.goals || goalsFallback(plan),
+    totalCalories: plan.totalCalories || 0,
+    macros: plan.macros || { protein: 0, carbs: 0, fat: 0 },
+    generatedAt: plan.generatedAt || plan.createdAt || new Date(),
+  };
+}
+
+function goalsFallback(plan: DietPlanType): Goal[] {
+  return Array.isArray(plan.goals) ? plan.goals : [];
+}
+
+// Enhanced mock AI-generated content with detailed nutrition (offline fallback)
 const generateMockDietPlan = (goals: Goal[], user: User | null): DietPlanType => {
   const mockMeals: Meal[] = [
     {
@@ -198,15 +224,30 @@ export default function DietPlan({ goals, user, onAddToCart }: DietPlanProps) {
   const [selectedTab, setSelectedTab] = useState<'meals' | 'supplements'>('meals');
   const [selectedMeal, setSelectedMeal] = useState<Meal | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const generatePlan = async () => {
     setIsLoading(true);
-    // Simulate AI processing time
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    const newPlan = generateMockDietPlan(goals, user);
-    setDietPlan(newPlan);
-    setIsLoading(false);
+    setError(null);
+
+    try {
+      const plan = await dietPlansAPI.generatePlan({
+        goals: goals.map((goal) => ({
+          id: goal.id,
+          type: goal.type,
+          title: goal.title,
+          description: goal.description,
+          priority: goal.priority,
+        })),
+      });
+      setDietPlan(normalizeDietPlan(plan));
+    } catch (err) {
+      console.error(err);
+      setError(getApiErrorMessage(err, 'Using offline sample plan'));
+      setDietPlan(generateMockDietPlan(goals, user));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -260,7 +301,7 @@ export default function DietPlan({ goals, user, onAddToCart }: DietPlanProps) {
       pdf.setTextColor(75, 85, 99); // gray-600
       pdf.text(`Generated for: ${user?.name || 'User'}`, 20, yPosition);
       yPosition += 8;
-      pdf.text(`Date: ${dietPlan.generatedAt.toLocaleDateString()}`, 20, yPosition);
+      pdf.text(`Date: ${new Date(dietPlan.generatedAt || dietPlan.createdAt || Date.now()).toLocaleDateString()}`, 20, yPosition);
       yPosition += 15;
 
       // Goals
@@ -297,7 +338,7 @@ export default function DietPlan({ goals, user, onAddToCart }: DietPlanProps) {
       pdf.text('Meal Plan:', 20, yPosition);
       yPosition += 10;
 
-      dietPlan.meals.forEach((meal, index) => {
+      dietPlan.meals.forEach((meal) => {
         if (yPosition > pageHeight - 40) {
           pdf.addPage();
           yPosition = 20;
@@ -409,7 +450,11 @@ export default function DietPlan({ goals, user, onAddToCart }: DietPlanProps) {
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="text-3xl font-bold text-gray-900 mb-2">Your Personalized Diet Plan</h2>
-            <p className="text-gray-600">Generated on {dietPlan.generatedAt.toLocaleDateString()}</p>
+            <p className="text-gray-600">
+              Generated on{' '}
+              {new Date(dietPlan.generatedAt || dietPlan.createdAt || Date.now()).toLocaleDateString()}
+            </p>
+            {error && <p className="text-sm text-amber-600 mt-2">{error}</p>}
           </div>
           <div className="mt-4 lg:mt-0 flex flex-wrap gap-3">
             <button

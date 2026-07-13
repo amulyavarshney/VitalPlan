@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Target, Sparkles, Heart, Shield, ArrowRight } from 'lucide-react';
 import type { Goal } from '../../types';
 
 interface GoalSelectionProps {
   selectedGoals: Goal[];
   onGoalsChange: (goals: Goal[]) => void;
-  onNext: () => void;
+  onNext: (goals: Goal[]) => void;
 }
 
 const goalOptions = [
@@ -189,7 +189,7 @@ export default function GoalSelection({ selectedGoals, onGoalsChange, onNext }: 
 
       <div className="flex justify-center mt-8">
         <button
-          onClick={onNext}
+          onClick={() => onNext(selectedGoals)}
           disabled={!canProceed}
           className={`inline-flex items-center px-8 py-3 border border-transparent text-base font-medium rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 ${
             canProceed

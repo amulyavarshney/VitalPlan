@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import { User, Save, AlertCircle, Camera, MapPin, Edit3 } from 'lucide-react';
+import { useState, type FormEvent } from 'react';
+import { User, Save, AlertCircle, Camera, MapPin } from 'lucide-react';
 import type { User as UserType } from '../../types';
 
 interface ProfileFormProps {
-  user?: UserType;
-  onSave: (userData: Partial<UserType>) => void;
+  user?: UserType | null;
+  onSave: (userData: Partial<UserType>) => void | Promise<void>;
   onNext?: () => void;
 }
 
@@ -37,6 +37,7 @@ export default function ProfileForm({ user, onSave, onNext }: ProfileFormProps) 
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showAvatarSelector, setShowAvatarSelector] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const dietaryOptions = [
     'Vegetarian', 'Vegan', 'Keto', 'Paleo', 'Mediterranean', 
@@ -66,18 +67,23 @@ export default function ProfileForm({ user, onSave, onNext }: ProfileFormProps) 
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (validateForm()) {
-      onSave({
-        ...formData,
-        age: Number(formData.age),
-        height: Number(formData.height),
-        weight: Number(formData.weight),
-      } as Partial<UserType>);
-      
-      if (onNext) {
-        onNext();
+      setIsSaving(true);
+      try {
+        await onSave({
+          ...formData,
+          age: Number(formData.age),
+          height: Number(formData.height),
+          weight: Number(formData.weight),
+        } as Partial<UserType>);
+
+        if (onNext) {
+          onNext();
+        }
+      } finally {
+        setIsSaving(false);
       }
     }
   };
@@ -213,9 +219,10 @@ export default function ProfileForm({ user, onSave, onNext }: ProfileFormProps) 
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                  disabled={!!user?.email}
                   className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors ${
                     errors.email ? 'border-red-500' : 'border-gray-300'
-                  }`}
+                  } ${user?.email ? 'bg-gray-50 text-gray-500' : ''}`}
                   placeholder="Enter your email"
                 />
                 {errors.email && (
@@ -421,10 +428,11 @@ export default function ProfileForm({ user, onSave, onNext }: ProfileFormProps) 
           <div className="flex justify-end pt-6 border-t border-gray-200">
             <button
               type="submit"
-              className="inline-flex items-center px-8 py-3 border border-transparent text-base font-medium rounded-xl text-white bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-600 hover:to-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+              disabled={isSaving}
+              className="inline-flex items-center px-8 py-3 border border-transparent text-base font-medium rounded-xl text-white bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-600 hover:to-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 disabled:opacity-60"
             >
               <Save className="w-5 h-5 mr-2" />
-              {onNext ? 'Save & Continue' : 'Save Profile'}
+              {isSaving ? 'Saving...' : onNext ? 'Save & Continue' : 'Save Profile'}
             </button>
           </div>
         </form>

@@ -17,17 +17,19 @@ export interface User {
 }
 
 export interface Goal {
-  id: string;
-  type: 'muscle-building' | 'glowing-skin' | 'healthy-aging' | 'health-conditions';
+  id: string | number;
+  type: 'muscle-building' | 'glowing-skin' | 'healthy-aging' | 'health-conditions' | string;
   title: string;
   description: string;
-  targetDate?: Date;
+  targetDate?: Date | string;
   priority: 'low' | 'medium' | 'high';
 }
 
 export interface DietPlan {
-  id: string;
-  userId: string;
+  id: string | number;
+  userId?: string | number;
+  name?: string;
+  description?: string;
   goals: Goal[];
   meals: Meal[];
   supplements: Supplement[];
@@ -37,7 +39,9 @@ export interface DietPlan {
     carbs: number;
     fat: number;
   };
-  generatedAt: Date;
+  aiRecommendations?: string[];
+  generatedAt?: Date | string;
+  createdAt?: Date | string;
 }
 
 export interface Meal {
@@ -85,13 +89,15 @@ export interface Supplement {
 }
 
 export interface Order {
-  id: string;
-  userId: string;
+  id: string | number;
+  userId: string | number;
   items: OrderItem[];
   total: number;
   status: 'pending' | 'processing' | 'shipped' | 'delivered';
-  createdAt: Date;
-  vendor: 'amazon' | 'walmart' | 'local';
+  createdAt: Date | string;
+  vendor: 'amazon' | 'walmart' | 'local' | string;
+  deliveryAddress?: string;
+  paymentMethod?: string;
 }
 
 export interface OrderItem {
@@ -108,7 +114,7 @@ export interface MarketplaceItem {
   description: string;
   price: number;
   originalPrice?: number;
-  category: 'supplements' | 'organic-foods' | 'superfoods' | 'protein' | 'vitamins';
+  category: 'supplements' | 'organic-foods' | 'superfoods' | 'protein' | 'vitamins' | string;
   brand: string;
   rating: number;
   reviews: number;
@@ -119,10 +125,11 @@ export interface MarketplaceItem {
 }
 
 export interface ScannedFood {
-  id: string;
+  id?: string | number;
   name: string;
+  foodName?: string;
   brand?: string;
-  barcode: string;
+  barcode?: string;
   calories: number;
   servingSize: string;
   macros: {
@@ -134,6 +141,6 @@ export interface ScannedFood {
   imageUrl?: string;
   confidence?: number;
   aiInsights?: string[];
-  analyzedAt?: Date;
+  analyzedAt?: Date | string;
   imageData?: string;
 }

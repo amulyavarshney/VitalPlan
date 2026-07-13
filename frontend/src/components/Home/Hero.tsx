@@ -1,4 +1,3 @@
-import React from 'react';
 import { ArrowRight, Sparkles, Target, Heart, Users, Award, TrendingUp } from 'lucide-react';
 
 interface HeroProps {

@@ -1,17 +1,20 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { ShoppingCart, Trash2, Plus, Minus, Package, CreditCard, MapPin } from 'lucide-react';
 import type { Order, OrderItem } from '../../types';
 
 interface OrderSystemProps {
   cartItems: OrderItem[];
   onUpdateCart: (items: OrderItem[]) => void;
-  onPlaceOrder: (order: Omit<Order, 'id' | 'createdAt'>) => void;
+  onPlaceOrder: (order: Omit<Order, 'id' | 'createdAt'>) => void | Promise<void>;
+  userId: string;
 }
 
-export default function OrderSystem({ cartItems, onUpdateCart, onPlaceOrder }: OrderSystemProps) {
+export default function OrderSystem({ cartItems, onUpdateCart, onPlaceOrder, userId }: OrderSystemProps) {
   const [selectedVendor, setSelectedVendor] = useState<'amazon' | 'walmart' | 'local'>('amazon');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('card');
+  const [isPlacing, setIsPlacing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const updateQuantity = (itemId: string, newQuantity: number) => {
     if (newQuantity <= 0) {
@@ -38,19 +41,29 @@ export default function OrderSystem({ cartItems, onUpdateCart, onPlaceOrder }: O
     return cartItems.reduce((total, item) => total + item.quantity, 0);
   };
 
-  const handlePlaceOrder = () => {
+  const handlePlaceOrder = async () => {
     if (cartItems.length === 0 || !deliveryAddress.trim()) return;
 
     const order: Omit<Order, 'id' | 'createdAt'> = {
-      userId: 'user-1', // In real app, this would come from auth
+      userId,
       items: cartItems,
       total: getTotalPrice(),
       status: 'pending',
-      vendor: selectedVendor
+      vendor: selectedVendor,
+      deliveryAddress: deliveryAddress.trim(),
+      paymentMethod,
     };
 
-    onPlaceOrder(order);
-    onUpdateCart([]); // Clear cart after order
+    setIsPlacing(true);
+    setError(null);
+    try {
+      await onPlaceOrder(order);
+      onUpdateCart([]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to place order');
+    } finally {
+      setIsPlacing(false);
+    }
   };
 
   const vendors = [
@@ -248,16 +261,17 @@ export default function OrderSystem({ cartItems, onUpdateCart, onPlaceOrder }: O
 
             <button
               onClick={handlePlaceOrder}
-              disabled={!deliveryAddress.trim()}
+              disabled={!deliveryAddress.trim() || isPlacing}
               className={`w-full py-3 px-4 rounded-xl font-medium transition-all duration-200 flex items-center justify-center ${
-                deliveryAddress.trim()
+                deliveryAddress.trim() && !isPlacing
                   ? 'bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-600 hover:to-blue-600 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5'
                   : 'bg-gray-200 text-gray-400 cursor-not-allowed'
               }`}
             >
               <Package className="w-5 h-5 mr-2" />
-              Place Order
+              {isPlacing ? 'Placing Order...' : 'Place Order'}
             </button>
+            {error && <p className="text-sm text-red-600 mt-3 text-center">{error}</p>}
           </div>
         </div>
       </div>

@@ -1,110 +1,51 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Camera, Scan, Upload, X, Info, Zap, Apple, RotateCcw, FlashlightOff as FlashOff, Slash as Flash } from 'lucide-react';
 import type { ScannedFood } from '../../types';
+import { scannerAPI, getApiErrorMessage } from '../../services/api';
 
 interface FoodScannerProps {
   onAddToCart?: (items: any[]) => void;
 }
 
-// Enhanced mock AI analysis with more realistic food recognition
-const analyzeImageWithAI = async (imageData: string): Promise<ScannedFood> => {
-  // Simulate AI processing time
-  await new Promise(resolve => setTimeout(resolve, 3000));
-  
-  // Mock AI analysis - in production, this would call Azure OpenAI Vision API
-  const foodOptions = [
-    {
-      id: 'food-apple',
-      name: 'Red Apple',
-      brand: 'Fresh Produce',
-      barcode: 'fresh-apple',
-      calories: 95,
-      servingSize: '1 medium apple (182g)',
-      macros: { protein: 0.5, carbs: 25, fat: 0.3 },
-      nutritionDetails: {
-        vitamins: { 'Vitamin C': '14% DV', 'Vitamin K': '5% DV' },
-        minerals: { 'Potassium': '6% DV', 'Manganese': '3% DV' },
-        fiber: 4.4,
-        sugar: 19,
-        sodium: 2,
-        cholesterol: 0,
-        saturatedFat: 0.1,
-        transFat: 0
-      },
-      imageUrl: 'https://images.pexels.com/photos/102104/pexels-photo-102104.jpeg?auto=compress&cs=tinysrgb&w=400',
-      confidence: 0.95,
-      aiInsights: [
-        'Rich in antioxidants and fiber',
-        'Great for heart health',
-        'Natural source of energy',
-        'Supports digestive health'
-      ]
-    },
-    {
-      id: 'food-banana',
-      name: 'Banana',
-      brand: 'Fresh Produce',
-      barcode: 'fresh-banana',
-      calories: 105,
-      servingSize: '1 medium banana (118g)',
-      macros: { protein: 1.3, carbs: 27, fat: 0.4 },
-      nutritionDetails: {
-        vitamins: { 'Vitamin B6': '20% DV', 'Vitamin C': '17% DV' },
-        minerals: { 'Potassium': '12% DV', 'Manganese': '16% DV' },
-        fiber: 3.1,
-        sugar: 14,
-        sodium: 1,
-        cholesterol: 0,
-        saturatedFat: 0.1,
-        transFat: 0
-      },
-      imageUrl: 'https://images.pexels.com/photos/61127/pexels-photo-61127.jpeg?auto=compress&cs=tinysrgb&w=400',
-      confidence: 0.92,
-      aiInsights: [
-        'Excellent source of potassium',
-        'Natural pre-workout fuel',
-        'Supports muscle function',
-        'Quick energy boost'
-      ]
-    },
-    {
-      id: 'food-sandwich',
-      name: 'Turkey Sandwich',
-      brand: 'Homemade',
-      barcode: 'sandwich-turkey',
-      calories: 320,
-      servingSize: '1 sandwich (150g)',
-      macros: { protein: 25, carbs: 35, fat: 8 },
-      nutritionDetails: {
-        vitamins: { 'Niacin': '25% DV', 'Vitamin B6': '15% DV' },
-        minerals: { 'Selenium': '30% DV', 'Phosphorus': '20% DV' },
-        fiber: 4,
-        sugar: 3,
-        sodium: 680,
-        cholesterol: 45,
-        saturatedFat: 2.5,
-        transFat: 0
-      },
-      imageUrl: 'https://images.pexels.com/photos/1603901/pexels-photo-1603901.jpeg?auto=compress&cs=tinysrgb&w=400',
-      confidence: 0.88,
-      aiInsights: [
-        'High protein content for muscle building',
-        'Balanced macronutrient profile',
-        'Good source of B vitamins',
-        'Moderate sodium - watch intake'
-      ]
-    }
-  ];
-  
-  // Randomly select a food item (in production, this would be based on actual image analysis)
-  const randomFood = foodOptions[Math.floor(Math.random() * foodOptions.length)];
-  
+function dataUrlToFile(dataUrl: string, filename: string): File {
+  const [header, base64] = dataUrl.split(',');
+  const mime = header.match(/:(.*?);/)?.[1] || 'image/jpeg';
+  const binary = atob(base64);
+  const array = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    array[i] = binary.charCodeAt(i);
+  }
+  return new File([array], filename, { type: mime });
+}
+
+function mapAnalysisToScannedFood(
+  analysis: Awaited<ReturnType<typeof scannerAPI.analyzeImage>>,
+  imageData?: string
+): ScannedFood {
   return {
-    ...randomFood,
-    analyzedAt: new Date(),
-    imageData: imageData
+    id: analysis.id || `scan-${Date.now()}`,
+    name: analysis.foodName || analysis.name || 'Unknown food',
+    brand: analysis.brand,
+    barcode: analysis.barcode || '',
+    calories: analysis.calories,
+    servingSize: analysis.servingSize,
+    macros: analysis.macros,
+    nutritionDetails: {
+      vitamins: analysis.nutritionDetails?.vitamins || {},
+      minerals: analysis.nutritionDetails?.minerals || {},
+      fiber: analysis.nutritionDetails?.fiber || 0,
+      sugar: analysis.nutritionDetails?.sugar || 0,
+      sodium: analysis.nutritionDetails?.sodium || 0,
+      cholesterol: analysis.nutritionDetails?.cholesterol || 0,
+      saturatedFat: analysis.nutritionDetails?.saturatedFat || 0,
+      transFat: analysis.nutritionDetails?.transFat || 0,
+    },
+    confidence: analysis.confidence,
+    aiInsights: analysis.aiInsights,
+    analyzedAt: analysis.analyzedAt ? new Date(analysis.analyzedAt) : new Date(),
+    imageData,
   };
-};
+}
 
 export default function FoodScanner({ onAddToCart }: FoodScannerProps) {
   const [isScanning, setIsScanning] = useState(false);
@@ -178,11 +119,12 @@ export default function FoodScanner({ onAddToCart }: FoodScannerProps) {
     // Start AI analysis
     setIsProcessing(true);
     try {
-      const result = await analyzeImageWithAI(imageData);
-      setScannedFood(result);
+      const file = dataUrlToFile(imageData, `scan-${Date.now()}.jpg`);
+      const analysis = await scannerAPI.analyzeImage(file);
+      setScannedFood(mapAnalysisToScannedFood(analysis, imageData));
     } catch (error) {
       console.error('Error analyzing image:', error);
-      setError('Failed to analyze image. Please try again.');
+      setError(getApiErrorMessage(error, 'Failed to analyze image. Please try again.'));
     } finally {
       setIsProcessing(false);
     }
@@ -195,14 +137,14 @@ export default function FoodScanner({ onAddToCart }: FoodScannerProps) {
     const reader = new FileReader();
     reader.onload = async (e) => {
       const imageData = e.target?.result as string;
-      
+
       setIsProcessing(true);
       try {
-        const result = await analyzeImageWithAI(imageData);
-        setScannedFood(result);
+        const analysis = await scannerAPI.analyzeImage(file);
+        setScannedFood(mapAnalysisToScannedFood(analysis, imageData));
       } catch (error) {
         console.error('Error analyzing image:', error);
-        setError('Failed to analyze image. Please try again.');
+        setError(getApiErrorMessage(error, 'Failed to analyze image. Please try again.'));
       } finally {
         setIsProcessing(false);
       }

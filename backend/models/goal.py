@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Boolean
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from services.database import Base
@@ -13,7 +13,7 @@ class Goal(Base):
     description = Column(Text)
     priority = Column(String, default="medium")  # low, medium, high
     target_date = Column(DateTime(timezone=True))
-    is_active = Column(String, default=True)
+    is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     

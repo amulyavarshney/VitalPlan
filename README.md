@@ -78,16 +78,16 @@ A comprehensive web application that provides personalized diet plans, AI-powere
 
 5. **Set up database**:
    ```bash
-   # Create PostgreSQL database
+   # Optional: create PostgreSQL database (SQLite is used by default)
    createdb vitalplan
    
-   # Run the application (tables will be created automatically)
-   python -m app.main
+   # Tables are created automatically on startup
+   python main.py
    ```
 
 6. **Start the API server**:
    ```bash
-   uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+   uvicorn main:app --reload --host 0.0.0.0 --port 8000
    ```
 
 ### Frontend Setup
