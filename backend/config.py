@@ -44,6 +44,15 @@ class Settings(BaseSettings):
     STRIPE_SECRET_KEY: str = ""
     STRIPE_PUBLISHABLE_KEY: str = ""
     FRONTEND_URL: str = "http://localhost:5173"
+
+    # Email / SMTP (console fallback when unset)
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM: str = ""
+    SMTP_USE_TLS: bool = True
+    SMTP_USE_SSL: bool = False
     
     # Azure OpenAI
     AZURE_OPENAI_API_KEY: str = ""

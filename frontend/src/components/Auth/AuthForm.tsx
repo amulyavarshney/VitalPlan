@@ -1,23 +1,42 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Heart, Loader, Mail, Lock, User as UserIcon } from 'lucide-react';
 import { useAuth, getApiErrorMessage } from '../../hooks/useAuth';
 import { authAPI } from '../../services/api';
 
 interface AuthFormProps {
   initialMode?: 'login' | 'register' | 'reset';
+  initialResetToken?: string;
   onSuccess?: () => void;
 }
 
-export default function AuthForm({ initialMode = 'login', onSuccess }: AuthFormProps) {
+export default function AuthForm({
+  initialMode = 'login',
+  initialResetToken,
+  onSuccess,
+}: AuthFormProps) {
   const { login, register } = useAuth();
+  const navigate = useNavigate();
   const [mode, setMode] = useState<'login' | 'register' | 'reset'>(initialMode);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [resetToken, setResetToken] = useState('');
+  const [resetToken, setResetToken] = useState(initialResetToken || '');
   const [info, setInfo] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    setMode(initialMode);
+  }, [initialMode]);
+
+  useEffect(() => {
+    if (initialResetToken) {
+      setResetToken(initialResetToken);
+      setMode('reset');
+      setInfo('Enter a new password to finish resetting your account.');
+    }
+  }, [initialResetToken]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -45,9 +64,15 @@ export default function AuthForm({ initialMode = 'login', onSuccess }: AuthFormP
       } else if (!resetToken) {
         const result = await authAPI.requestPasswordReset(email);
         setInfo(result.message);
+        if (result.reset_url) {
+          setInfo(`${result.message} Open the reset link from your email, or use the link returned for local testing.`);
+        }
         if (result.reset_token) {
           setResetToken(result.reset_token);
           setInfo(`${result.message} Dev token ready — enter a new password below.`);
+        }
+        if (result.delivery === 'console') {
+          setInfo((prev) => `${prev || result.message} (Email logged to server console — SMTP not configured.)`);
         }
       } else {
         await authAPI.confirmPasswordReset(resetToken, password);
@@ -55,6 +80,7 @@ export default function AuthForm({ initialMode = 'login', onSuccess }: AuthFormP
         setMode('login');
         setResetToken('');
         setPassword('');
+        navigate('/login', { replace: true });
       }
     } catch (err) {
       setError(getApiErrorMessage(err, 'Authentication failed'));
@@ -110,7 +136,8 @@ export default function AuthForm({ initialMode = 'login', onSuccess }: AuthFormP
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 placeholder="you@example.com"
-                required
+                required={mode !== 'reset' || !resetToken}
+                disabled={mode === 'reset' && !!resetToken}
               />
             </div>
           </div>
@@ -161,48 +188,31 @@ export default function AuthForm({ initialMode = 'login', onSuccess }: AuthFormP
         <div className="text-center text-sm text-gray-600 mt-6 space-y-2">
           {mode === 'login' && (
             <>
-              <button
-                type="button"
-                onClick={() => {
-                  setMode('reset');
-                  setError(null);
-                  setInfo(null);
-                }}
-                className="text-emerald-600 font-medium hover:underline block w-full"
-              >
+              <Link to="/reset-password" className="text-emerald-600 font-medium hover:underline block w-full">
                 Forgot password?
-              </button>
+              </Link>
               <p>
                 Don&apos;t have an account?{' '}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode('register');
-                    setError(null);
-                    setInfo(null);
-                  }}
-                  className="text-emerald-600 font-medium hover:underline"
-                >
+                <Link to="/register" className="text-emerald-600 font-medium hover:underline">
                   Sign up
-                </button>
+                </Link>
               </p>
             </>
           )}
-          {mode !== 'login' && (
+          {mode === 'register' && (
+            <p>
+              Already have an account?{' '}
+              <Link to="/login" className="text-emerald-600 font-medium hover:underline">
+                Sign in
+              </Link>
+            </p>
+          )}
+          {mode === 'reset' && (
             <p>
               Remembered your password?{' '}
-              <button
-                type="button"
-                onClick={() => {
-                  setMode('login');
-                  setError(null);
-                  setInfo(null);
-                  setResetToken('');
-                }}
-                className="text-emerald-600 font-medium hover:underline"
-              >
+              <Link to="/login" className="text-emerald-600 font-medium hover:underline">
                 Sign in
-              </button>
+              </Link>
             </p>
           )}
         </div>

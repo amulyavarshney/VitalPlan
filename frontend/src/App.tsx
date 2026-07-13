@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Navigate, Route, Routes, useNavigate, useSearchParams } from 'react-router-dom';
 import Header from './components/Layout/Header';
 import Hero from './components/Home/Hero';
 import ProfileForm from './components/Profile/ProfileForm';
@@ -8,52 +9,41 @@ import OrderSystem from './components/Orders/OrderSystem';
 import Marketplace from './components/Marketplace/Marketplace';
 import FoodScanner from './components/Scanner/FoodScanner';
 import AuthForm from './components/Auth/AuthForm';
+import ProtectedRoute from './components/ProtectedRoute';
 import { useAuth, getApiErrorMessage } from './hooks/useAuth';
 import { goalsAPI, ordersAPI } from './services/api';
 import type { User, Goal, OrderItem, Order } from './types';
 
-function AppContent() {
-  const { user, isAuthenticated, isLoading, updateProfile, toAppUser } = useAuth();
-  const [currentView, setCurrentView] = useState('home');
-  const [goals, setGoals] = useState<Goal[]>([]);
-  const [cartItems, setCartItems] = useState<OrderItem[]>([]);
-  const [, setOrders] = useState<Order[]>([]);
-  const [onboardingStep, setOnboardingStep] = useState(0); // 0: profile, 1: goals, 2: complete
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('register');
+function AuthPage({ mode }: { mode: 'login' | 'register' | 'reset' }) {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get('token') || undefined;
 
+  return (
+    <AuthForm
+      initialMode={mode}
+      initialResetToken={token}
+      onSuccess={() => navigate('/profile', { replace: true })}
+    />
+  );
+}
+
+function ProfilePage({
+  goals,
+  setGoals,
+  onboardingStep,
+  setOnboardingStep,
+  showMessage,
+}: {
+  goals: Goal[];
+  setGoals: (goals: Goal[]) => void;
+  onboardingStep: number;
+  setOnboardingStep: (step: number) => void;
+  showMessage: (message: string) => void;
+}) {
+  const navigate = useNavigate();
+  const { updateProfile, toAppUser } = useAuth();
   const appUser = toAppUser();
-
-  useEffect(() => {
-    if (!isAuthenticated) {
-      setGoals([]);
-      return;
-    }
-
-    goalsAPI
-      .getGoals()
-      .then(setGoals)
-      .catch(() => setGoals([]));
-
-    ordersAPI
-      .getOrders()
-      .then(setOrders)
-      .catch(() => setOrders([]));
-  }, [isAuthenticated]);
-
-  const showMessage = (message: string) => {
-    setStatusMessage(message);
-    window.setTimeout(() => setStatusMessage(null), 3000);
-  };
-
-  const requireAuth = (view: string) => {
-    if (!isAuthenticated && view !== 'home' && view !== 'auth') {
-      setAuthMode('login');
-      setCurrentView('auth');
-      return;
-    }
-    setCurrentView(view);
-  };
 
   const handleUserSave = async (userData: Partial<User>) => {
     await updateProfile({
@@ -70,16 +60,6 @@ function AppContent() {
       location: userData.location,
     });
     showMessage('Profile saved');
-  };
-
-  const handleGetStarted = () => {
-    if (!isAuthenticated) {
-      setAuthMode('register');
-      setCurrentView('auth');
-      return;
-    }
-    setCurrentView('profile');
-    setOnboardingStep(user?.age ? 1 : 0);
   };
 
   const handleGoalsComplete = async (selectedGoals: Goal[]) => {
@@ -101,13 +81,84 @@ function AppContent() {
 
       setGoals(created.length ? created : selectedGoals);
       setOnboardingStep(2);
-      setCurrentView('plans');
+      navigate('/plans');
     } catch (error) {
       showMessage(getApiErrorMessage(error, 'Failed to save goals'));
       setGoals(selectedGoals);
       setOnboardingStep(2);
-      setCurrentView('plans');
+      navigate('/plans');
     }
+  };
+
+  if (onboardingStep === 0) {
+    return (
+      <ProfileForm
+        user={appUser}
+        onSave={handleUserSave}
+        onNext={() => setOnboardingStep(1)}
+      />
+    );
+  }
+
+  if (onboardingStep === 1) {
+    return (
+      <GoalSelection
+        selectedGoals={goals}
+        onGoalsChange={setGoals}
+        onNext={handleGoalsComplete}
+      />
+    );
+  }
+
+  return <ProfileForm user={appUser} onSave={handleUserSave} />;
+}
+
+function AppContent() {
+  const { user, isAuthenticated, isLoading, toAppUser } = useAuth();
+  const navigate = useNavigate();
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [cartItems, setCartItems] = useState<OrderItem[]>([]);
+  const [, setOrders] = useState<Order[]>([]);
+  const [onboardingStep, setOnboardingStep] = useState(0);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
+  const appUser = toAppUser();
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setGoals([]);
+      return;
+    }
+
+    goalsAPI
+      .getGoals()
+      .then(setGoals)
+      .catch(() => setGoals([]));
+
+    ordersAPI
+      .getOrders()
+      .then(setOrders)
+      .catch(() => setOrders([]));
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (isAuthenticated && user?.age) {
+      setOnboardingStep((step) => (step === 0 ? 1 : step));
+    }
+  }, [isAuthenticated, user?.age]);
+
+  const showMessage = (message: string) => {
+    setStatusMessage(message);
+    window.setTimeout(() => setStatusMessage(null), 3000);
+  };
+
+  const handleGetStarted = () => {
+    if (!isAuthenticated) {
+      navigate('/register');
+      return;
+    }
+    setOnboardingStep(user?.age ? 1 : 0);
+    navigate('/profile');
   };
 
   const handleAddToCart = (items: OrderItem[]) => {
@@ -135,140 +186,29 @@ function AppContent() {
     showMessage(`${items.length} item(s) added to cart`);
   };
 
-  const handlePlaceOrder = async (orderData: Omit<Order, 'id' | 'createdAt'>) => {
-    try {
-      const result = await ordersAPI.createOrder({
-        items: orderData.items,
-        total: orderData.total,
-        vendor: orderData.vendor,
-        deliveryAddress: orderData.deliveryAddress,
-        paymentMethod: orderData.paymentMethod || 'card',
-      });
-
-      const paid = await ordersAPI.payOrder(result.order_id, result.payment.payment_intent_id);
-
-      const newOrder: Order = {
-        ...orderData,
-        id: result.order_id,
-        createdAt: new Date(),
-        status: (paid.status as Order['status']) || 'processing',
-        paymentStatus: paid.paymentStatus || 'paid',
-        paymentIntentId: paid.paymentIntentId,
-        paymentProvider: paid.paymentProvider,
-      };
-      setOrders((prev) => [newOrder, ...prev]);
-      showMessage(
-        result.payment.provider === 'demo'
-          ? 'Order placed and paid (demo payment)'
-          : 'Order placed and payment confirmed'
-      );
-    } catch (error) {
-      showMessage(getApiErrorMessage(error, 'Failed to place order'));
-      throw error;
-    }
+  const handleOrderComplete = (order: Order) => {
+    setOrders((prev) => [order, ...prev]);
+    showMessage(
+      order.paymentProvider === 'demo'
+        ? 'Order placed and paid (demo payment)'
+        : 'Order placed and payment confirmed'
+    );
   };
 
-  const getCartItemsCount = () => {
-    return cartItems.reduce((total, item) => total + item.quantity, 0);
-  };
+  const getCartItemsCount = () => cartItems.reduce((total, item) => total + item.quantity, 0);
 
-  const renderContent = () => {
-    if (isLoading) {
-      return (
-        <div className="min-h-[50vh] flex items-center justify-center text-gray-600">
-          Loading...
-        </div>
-      );
-    }
-
-    switch (currentView) {
-      case 'home':
-        return <Hero onGetStarted={handleGetStarted} />;
-
-      case 'auth':
-        return (
-          <AuthForm
-            initialMode={authMode}
-            onSuccess={() => {
-              setCurrentView('profile');
-              setOnboardingStep(0);
-            }}
-          />
-        );
-
-      case 'profile':
-        if (!isAuthenticated) {
-          return <AuthForm initialMode="login" onSuccess={() => setCurrentView('profile')} />;
-        }
-        if (onboardingStep === 0) {
-          return (
-            <ProfileForm
-              user={appUser}
-              onSave={handleUserSave}
-              onNext={() => setOnboardingStep(1)}
-            />
-          );
-        }
-        if (onboardingStep === 1) {
-          return (
-            <GoalSelection
-              selectedGoals={goals}
-              onGoalsChange={setGoals}
-              onNext={handleGoalsComplete}
-            />
-          );
-        }
-        return <ProfileForm user={appUser} onSave={handleUserSave} />;
-
-      case 'plans':
-        if (!isAuthenticated) {
-          return <AuthForm initialMode="login" onSuccess={() => setCurrentView('plans')} />;
-        }
-        return (
-          <DietPlan
-            goals={goals}
-            user={appUser}
-            onAddToCart={handleAddToCart}
-          />
-        );
-
-      case 'marketplace':
-        if (!isAuthenticated) {
-          return <AuthForm initialMode="login" onSuccess={() => setCurrentView('marketplace')} />;
-        }
-        return <Marketplace onAddToCart={handleAddToCart} />;
-
-      case 'scanner':
-        if (!isAuthenticated) {
-          return <AuthForm initialMode="login" onSuccess={() => setCurrentView('scanner')} />;
-        }
-        return <FoodScanner onAddToCart={handleAddToCart} />;
-
-      case 'orders':
-        if (!isAuthenticated) {
-          return <AuthForm initialMode="login" onSuccess={() => setCurrentView('orders')} />;
-        }
-        return (
-          <OrderSystem
-            cartItems={cartItems}
-            onUpdateCart={setCartItems}
-            onPlaceOrder={handlePlaceOrder}
-            userId={appUser?.id || '0'}
-          />
-        );
-
-      default:
-        return <Hero onGetStarted={handleGetStarted} />;
-    }
-  };
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header cartItemsCount={0} />
+        <div className="min-h-[50vh] flex items-center justify-center text-gray-600">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header
-        currentView={currentView}
-        onViewChange={requireAuth}
-        cartItemsCount={getCartItemsCount()}
-      />
+      <Header cartItemsCount={getCartItemsCount()} />
       {statusMessage && (
         <div className="fixed top-16 inset-x-0 z-40 flex justify-center px-4 pointer-events-none">
           <div className="bg-emerald-600 text-white text-sm px-4 py-2 rounded-full shadow-lg">
@@ -276,7 +216,66 @@ function AppContent() {
           </div>
         </div>
       )}
-      <main>{renderContent()}</main>
+      <main>
+        <Routes>
+          <Route path="/" element={<Hero onGetStarted={handleGetStarted} />} />
+          <Route path="/login" element={<AuthPage mode="login" />} />
+          <Route path="/register" element={<AuthPage mode="register" />} />
+          <Route path="/reset-password" element={<AuthPage mode="reset" />} />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <ProfilePage
+                  goals={goals}
+                  setGoals={setGoals}
+                  onboardingStep={onboardingStep}
+                  setOnboardingStep={setOnboardingStep}
+                  showMessage={showMessage}
+                />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/plans"
+            element={
+              <ProtectedRoute>
+                <DietPlan goals={goals} user={appUser} onAddToCart={handleAddToCart} />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/marketplace"
+            element={
+              <ProtectedRoute>
+                <Marketplace onAddToCart={handleAddToCart} />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/scanner"
+            element={
+              <ProtectedRoute>
+                <FoodScanner onAddToCart={handleAddToCart} />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/orders"
+            element={
+              <ProtectedRoute>
+                <OrderSystem
+                  cartItems={cartItems}
+                  onUpdateCart={setCartItems}
+                  userId={appUser?.id || '0'}
+                  onOrderComplete={handleOrderComplete}
+                />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </main>
     </div>
   );
 }

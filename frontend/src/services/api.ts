@@ -124,7 +124,13 @@ export const authAPI = {
   },
   requestPasswordReset: async (email: string) => {
     const response = await api.post('/auth/password-reset/request', { email });
-    return response.data as { message: string; reset_token?: string; note?: string };
+    return response.data as {
+      message: string;
+      reset_token?: string;
+      reset_url?: string;
+      delivery?: string;
+      note?: string;
+    };
   },
   confirmPasswordReset: async (token: string, newPassword: string) => {
     const response = await api.post('/auth/password-reset/confirm', {
@@ -249,6 +255,14 @@ export const marketplaceAPI = {
 };
 
 export const ordersAPI = {
+  getPaymentConfig: async () => {
+    const response = await api.get('/orders/payments/config');
+    return keysToCamel<{
+      provider: string;
+      publishableKey?: string | null;
+      stripeEnabled: boolean;
+    }>(response.data);
+  },
   createOrder: async (orderData: {
     items: OrderItem[];
     total: number;

@@ -12,6 +12,7 @@ from services.auth_service import (
     create_password_reset_token,
 )
 from services.rate_limit import auth_rate_limiter, password_reset_limiter, client_key
+from services.email_service import send_password_reset_email
 from config import settings
 from models.user import User
 from schemas.user import (
@@ -118,10 +119,7 @@ async def request_password_reset(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """Request a password reset token.
-
-    Always returns a generic message. In development, includes the token for testing.
-    """
+    """Request a password reset email (console fallback when SMTP unset)."""
     password_reset_limiter.check(client_key(request, "password-reset"))
 
     user = db.query(User).filter(User.email == payload.email).first()
@@ -132,9 +130,20 @@ async def request_password_reset(
     if user and user.is_active:
         token = create_password_reset_token(user.email)
         logger.info("Password reset requested for %s", user.email)
+        try:
+            delivery = send_password_reset_email(to_email=user.email, reset_token=token)
+            response["delivery"] = delivery["mode"]
+        except Exception:
+            logger.exception("Password reset email failed for %s", user.email)
+            if settings.ENVIRONMENT == "production":
+                raise HTTPException(status_code=500, detail="Unable to send reset email")
+            response["delivery"] = "failed"
+
+        # Helpful for local/testing when SMTP is not configured
         if settings.ENVIRONMENT != "production":
             response["reset_token"] = token
-            response["note"] = "Token returned only in non-production environments"
+            response["reset_url"] = f"{settings.FRONTEND_URL.rstrip('/')}/reset-password?token={token}"
+            response["note"] = "Token/URL returned only in non-production environments"
 
     return response
 

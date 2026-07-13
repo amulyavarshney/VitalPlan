@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 from services.database import get_db
 from services.auth_service import get_current_user
-from services.payment_service import create_payment_intent, confirm_payment
+from services.payment_service import create_payment_intent, confirm_payment, payment_public_config
 from models.user import User
 from models.order import Order
 from schemas.order import (
@@ -18,6 +18,12 @@ from schemas.order import (
 )
 
 router = APIRouter()
+
+
+@router.get("/payments/config")
+async def get_payment_config(current_user: User = Depends(get_current_user)):
+    """Public payment configuration for the authenticated client."""
+    return payment_public_config()
 
 
 @router.post("/", response_model=OrderCreateResponse)

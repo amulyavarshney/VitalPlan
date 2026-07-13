@@ -75,10 +75,10 @@ async def create_payment_intent(
 
 
 async def confirm_payment(payment_intent_id: str) -> Dict[str, Any]:
-    """Confirm/finalize a payment.
+    """Verify a payment intent is complete.
 
-    Demo intents are always confirmable.
-    Stripe intents are retrieved and accepted when succeeded/processing.
+    Demo intents always succeed.
+    Stripe intents must already be confirmed client-side (Elements) or succeeded.
     """
     if payment_intent_id.startswith("demo_pi_"):
         return {
@@ -102,18 +102,6 @@ async def confirm_payment(payment_intent_id: str) -> Dict[str, Any]:
         payload = response.json()
         status = payload.get("status")
         if status not in {"succeeded", "processing"}:
-            # For test/dev without Elements, allow confirming via API when secret key present
-            confirm = await client.post(
-                f"https://api.stripe.com/v1/payment_intents/{payment_intent_id}/confirm",
-                data={"payment_method": "pm_card_visa"},
-                auth=(settings.STRIPE_SECRET_KEY, ""),
-            )
-            if confirm.status_code >= 400:
-                raise RuntimeError(f"Payment not completed (status={status})")
-            payload = confirm.json()
-            status = payload.get("status")
-
-        if status not in {"succeeded", "processing"}:
             raise RuntimeError(f"Payment not completed (status={status})")
 
         return {
@@ -121,3 +109,11 @@ async def confirm_payment(payment_intent_id: str) -> Dict[str, Any]:
             "payment_intent_id": payment_intent_id,
             "status": status,
         }
+
+
+def payment_public_config() -> Dict[str, Any]:
+    return {
+        "provider": "stripe" if payments_enabled() else "demo",
+        "publishable_key": settings.STRIPE_PUBLISHABLE_KEY if payments_enabled() else None,
+        "stripe_enabled": payments_enabled() and bool(settings.STRIPE_PUBLISHABLE_KEY),
+    }
