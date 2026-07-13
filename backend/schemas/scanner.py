@@ -12,6 +12,9 @@ class FoodAnalysisResult(BaseModel):
     ai_insights: List[str]
     analyzed_at: datetime
     image_processed: bool
+    image_url: Optional[str] = None
+    brand: Optional[str] = None
+    barcode: Optional[str] = None
 
 class ScannedFoodBase(BaseModel):
     name: str

@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "dev-only-change-me-in-production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 14
     ADMIN_REGISTRATION_SECRET: str = ""
     
     # Database
@@ -32,6 +33,12 @@ class Settings(BaseSettings):
     
     # CORS
     ALLOWED_HOSTS: List[str] = ["http://localhost:3000", "http://localhost:5173"]
+
+    # Uploads
+    UPLOAD_DIR: str = "./uploads"
+
+    # Open Food Facts
+    OPEN_FOOD_FACTS_USER_AGENT: str = "VitalPlan/1.0 (contact: support@vitalplan.local)"
     
     # Azure OpenAI
     AZURE_OPENAI_API_KEY: str = ""

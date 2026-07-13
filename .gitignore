@@ -452,3 +452,8 @@ test-results.xml
 *.pkl
 *.pickle
 checkpoints/ 
+
+# Local uploads
+uploads/
+backend/uploads/
+*.db

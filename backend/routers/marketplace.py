@@ -3,15 +3,20 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 
 from services.database import get_db
-from services.auth_service import get_current_user
+from services.auth_service import get_current_user, get_current_admin_user
 from models.user import User
+from models.marketplace_item import MarketplaceItem
+from schemas.marketplace import (
+    MarketplaceItem as MarketplaceItemSchema,
+    MarketplaceItemCreate,
+    MarketplaceItemUpdate,
+)
 
 router = APIRouter()
 
-# Mock marketplace data (Phase 0 — will move to DB in Phase 2)
-MOCK_MARKETPLACE_ITEMS = [
+SEED_ITEMS = [
     {
-        "id": "market-1",
+        "sku": "market-1",
         "name": "Premium Whey Protein Isolate",
         "description": "Ultra-pure whey protein isolate with 25g protein per serving. Perfect for muscle building and recovery.",
         "price": 49.99,
@@ -25,7 +30,7 @@ MOCK_MARKETPLACE_ITEMS = [
         "features": ["25g Protein", "Low Carb", "Fast Absorption", "Gluten Free", "Third-Party Tested"],
     },
     {
-        "id": "market-2",
+        "sku": "market-2",
         "name": "Organic Spirulina Powder",
         "description": "Premium organic spirulina powder packed with nutrients, antioxidants, and complete proteins.",
         "price": 24.99,
@@ -38,7 +43,7 @@ MOCK_MARKETPLACE_ITEMS = [
         "features": ["Organic Certified", "Complete Protein", "Rich in Iron", "Antioxidant Power", "Vegan Friendly"],
     },
     {
-        "id": "market-3",
+        "sku": "market-3",
         "name": "Advanced Multivitamin Complex",
         "description": "Comprehensive multivitamin with 25+ essential vitamins and minerals for optimal health.",
         "price": 34.99,
@@ -52,7 +57,7 @@ MOCK_MARKETPLACE_ITEMS = [
         "features": ["25+ Nutrients", "Whole Food Based", "Easy Absorption", "Non-GMO", "Vegetarian"],
     },
     {
-        "id": "market-4",
+        "sku": "market-4",
         "name": "Organic Quinoa Grain",
         "description": "Premium organic quinoa - a complete protein superfood perfect for healthy meals.",
         "price": 12.99,
@@ -65,7 +70,7 @@ MOCK_MARKETPLACE_ITEMS = [
         "features": ["Complete Protein", "Gluten Free", "High Fiber", "Organic Certified", "Versatile"],
     },
     {
-        "id": "market-5",
+        "sku": "market-5",
         "name": "Collagen Beauty Blend",
         "description": "Marine collagen peptides with hyaluronic acid and vitamin C for skin, hair, and nail health.",
         "price": 39.99,
@@ -78,7 +83,7 @@ MOCK_MARKETPLACE_ITEMS = [
         "features": ["Marine Collagen", "Hyaluronic Acid", "Vitamin C", "Beauty Support", "Unflavored"],
     },
     {
-        "id": "market-6",
+        "sku": "market-6",
         "name": "Organic Chia Seeds",
         "description": "Premium organic chia seeds rich in omega-3s, fiber, and plant-based protein.",
         "price": 9.99,
@@ -92,6 +97,36 @@ MOCK_MARKETPLACE_ITEMS = [
     },
 ]
 
+
+def seed_marketplace_if_empty(db: Session) -> None:
+    if db.query(MarketplaceItem).count() > 0:
+        return
+    for item in SEED_ITEMS:
+        db.add(MarketplaceItem(**item))
+    db.commit()
+
+
+def serialize_item(item: MarketplaceItem) -> dict:
+    return {
+        "id": item.sku,
+        "sku": item.sku,
+        "name": item.name,
+        "description": item.description,
+        "price": item.price,
+        "original_price": item.original_price,
+        "category": item.category,
+        "brand": item.brand,
+        "rating": item.rating,
+        "reviews": item.reviews,
+        "image_url": item.image_url,
+        "in_stock": item.in_stock,
+        "features": item.features or [],
+        "is_active": item.is_active,
+        "created_at": item.created_at,
+        "updated_at": item.updated_at,
+    }
+
+
 @router.get("/items")
 async def get_marketplace_items(
     category: Optional[str] = Query(None),
@@ -99,94 +134,160 @@ async def get_marketplace_items(
     sort_by: Optional[str] = Query("featured"),
     limit: int = Query(20, le=100),
     offset: int = Query(0),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """Get marketplace items with filtering and pagination"""
-    items = MOCK_MARKETPLACE_ITEMS.copy()
-    
-    # Filter by category
+    seed_marketplace_if_empty(db)
+
+    query = db.query(MarketplaceItem).filter(MarketplaceItem.is_active == True)  # noqa: E712
+
     if category and category != "all":
-        items = [item for item in items if item["category"] == category]
-    
-    # Filter by search term
+        query = query.filter(MarketplaceItem.category == category)
+
     if search:
-        search_lower = search.lower()
-        items = [
-            item for item in items
-            if search_lower in item["name"].lower() or
-               search_lower in item["description"].lower() or
-               search_lower in item["brand"].lower()
-        ]
-    
-    # Sort items
+        like = f"%{search}%"
+        query = query.filter(
+            (MarketplaceItem.name.ilike(like))
+            | (MarketplaceItem.description.ilike(like))
+            | (MarketplaceItem.brand.ilike(like))
+        )
+
     if sort_by == "price-low":
-        items.sort(key=lambda x: x["price"])
+        query = query.order_by(MarketplaceItem.price.asc())
     elif sort_by == "price-high":
-        items.sort(key=lambda x: x["price"], reverse=True)
+        query = query.order_by(MarketplaceItem.price.desc())
     elif sort_by == "rating":
-        items.sort(key=lambda x: x["rating"], reverse=True)
+        query = query.order_by(MarketplaceItem.rating.desc())
     elif sort_by == "reviews":
-        items.sort(key=lambda x: x["reviews"], reverse=True)
-    
-    # Pagination
-    total = len(items)
-    items = items[offset:offset + limit]
-    
+        query = query.order_by(MarketplaceItem.reviews.desc())
+    else:
+        query = query.order_by(MarketplaceItem.id.asc())
+
+    total = query.count()
+    items = query.offset(offset).limit(limit).all()
+
     return {
-        "items": items,
+        "items": [serialize_item(item) for item in items],
         "total": total,
         "limit": limit,
-        "offset": offset
+        "offset": offset,
     }
 
+
 @router.get("/categories")
-async def get_categories(current_user: User = Depends(get_current_user)):
+async def get_categories(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """Get available product categories"""
+    seed_marketplace_if_empty(db)
+    items = db.query(MarketplaceItem).filter(MarketplaceItem.is_active == True).all()  # noqa: E712
     categories = [
-        {"id": "all", "name": "All Products", "count": len(MOCK_MARKETPLACE_ITEMS)},
+        {"id": "all", "name": "All Products", "count": len(items)},
         {"id": "supplements", "name": "Supplements", "count": 0},
         {"id": "protein", "name": "Protein", "count": 0},
         {"id": "vitamins", "name": "Vitamins", "count": 0},
         {"id": "superfoods", "name": "Superfoods", "count": 0},
-        {"id": "organic-foods", "name": "Organic Foods", "count": 0}
+        {"id": "organic-foods", "name": "Organic Foods", "count": 0},
     ]
-    
-    # Count items in each category
     for category in categories:
         if category["id"] != "all":
-            category["count"] = len([
-                item for item in MOCK_MARKETPLACE_ITEMS
-                if item["category"] == category["id"]
-            ])
-    
+            category["count"] = len([i for i in items if i.category == category["id"]])
     return categories
+
 
 @router.get("/items/{item_id}")
 async def get_marketplace_item(
     item_id: str,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
-    """Get a specific marketplace item"""
-    item = next((item for item in MOCK_MARKETPLACE_ITEMS if item["id"] == item_id), None)
-    
-    if not item:
+    """Get a specific marketplace item by sku or numeric id"""
+    seed_marketplace_if_empty(db)
+    item = db.query(MarketplaceItem).filter(MarketplaceItem.sku == item_id).first()
+    if not item and item_id.isdigit():
+        item = db.query(MarketplaceItem).filter(MarketplaceItem.id == int(item_id)).first()
+    if not item or not item.is_active:
         raise HTTPException(status_code=404, detail="Item not found")
-    
-    return item
+    return serialize_item(item)
+
 
 @router.get("/recommendations")
 async def get_recommendations(
     current_user: User = Depends(get_current_user),
-    limit: int = Query(6, le=20)
+    db: Session = Depends(get_db),
+    limit: int = Query(6, le=20),
 ):
-    """Get personalized product recommendations"""
-    recommendations = sorted(
-        MOCK_MARKETPLACE_ITEMS,
-        key=lambda x: x["rating"],
-        reverse=True
-    )[:limit]
-    
+    """Get top-rated product recommendations"""
+    seed_marketplace_if_empty(db)
+    items = (
+        db.query(MarketplaceItem)
+        .filter(MarketplaceItem.is_active == True)  # noqa: E712
+        .order_by(MarketplaceItem.rating.desc())
+        .limit(limit)
+        .all()
+    )
     return {
-        "recommendations": recommendations,
-        "reason": "Based on your health goals and preferences"
+        "recommendations": [serialize_item(item) for item in items],
+        "reason": "Based on your health goals and preferences",
     }
+
+
+@router.post("/admin/items", response_model=MarketplaceItemSchema)
+async def create_marketplace_item(
+    payload: MarketplaceItemCreate,
+    current_admin: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    existing = db.query(MarketplaceItem).filter(MarketplaceItem.sku == payload.sku).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="SKU already exists")
+
+    item = MarketplaceItem(**payload.model_dump())
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@router.put("/admin/items/{item_id}", response_model=MarketplaceItemSchema)
+async def update_marketplace_item(
+    item_id: int,
+    payload: MarketplaceItemUpdate,
+    current_admin: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    item = db.query(MarketplaceItem).filter(MarketplaceItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(item, field, value)
+
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@router.delete("/admin/items/{item_id}")
+async def delete_marketplace_item(
+    item_id: int,
+    current_admin: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    item = db.query(MarketplaceItem).filter(MarketplaceItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    item.is_active = False
+    db.commit()
+    return {"message": "Item deactivated"}
+
+
+@router.get("/admin/items", response_model=List[MarketplaceItemSchema])
+async def list_admin_marketplace_items(
+    current_admin: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    seed_marketplace_if_empty(db)
+    return db.query(MarketplaceItem).order_by(MarketplaceItem.id.desc()).all()

@@ -53,6 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(profile);
     } catch {
       localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
       setUser(null);
     } finally {
       setIsLoading(false);
@@ -68,6 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const handleLogout = () => {
+      localStorage.removeItem('refresh_token');
       setUser(null);
     };
     window.addEventListener('auth:logout', handleLogout);
@@ -75,8 +77,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [loadUser]);
 
   const login = async (email: string, password: string) => {
-    const { access_token } = await authAPI.login({ email, password });
-    localStorage.setItem('access_token', access_token);
+    const tokens = await authAPI.login({ email, password });
+    localStorage.setItem('access_token', tokens.access_token);
+    if (tokens.refresh_token) {
+      localStorage.setItem('refresh_token', tokens.refresh_token);
+    }
     setIsLoading(true);
     await loadUser();
   };
@@ -88,6 +93,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = () => {
     localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
     setUser(null);
   };
 

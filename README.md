@@ -168,10 +168,12 @@ Once the backend is running, visit:
 ### Food Scanner
 - `POST /api/scanner/analyze-image` - Analyze food image
 - `GET /api/scanner/history` - Get scan history
-- `POST /api/scanner/barcode/{barcode}` - Scan barcode
+- `POST /api/scanner/barcode/{barcode}` - Lookup barcode via Open Food Facts
 
 ### Marketplace & Orders
 - `GET /api/marketplace/items` - Get marketplace items
+- `POST /api/marketplace/admin/items` - Create product (admin)
+- `PUT /api/marketplace/admin/items/{id}` - Update product (admin)
 - `POST /api/orders` - Create new order
 - `GET /api/orders` - Get user orders
 

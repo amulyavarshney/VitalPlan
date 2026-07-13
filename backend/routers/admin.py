@@ -8,8 +8,8 @@ from services.database import get_db
 from services.auth_service import (
     verify_password,
     get_password_hash,
-    create_access_token,
     create_spoof_token,
+    create_token_pair,
     get_current_admin_user,
 )
 from config import settings
@@ -117,12 +117,7 @@ async def login_admin(admin_credentials: UserLogin, db: Session = Depends(get_db
             detail="Inactive user",
         )
 
-    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.email, "admin": True}, expires_delta=access_token_expires
-    )
-
-    return {"access_token": access_token, "token_type": "bearer"}
+    return create_token_pair(user.email, extra={"admin": True})
 
 
 @router.get("/users", response_model=List[UserSchema])
@@ -167,6 +162,7 @@ async def spoof_user(
         target_email=target_user.email,
         expires_delta=access_token_expires,
     )
+    refresh = create_token_pair(target_user.email)["refresh_token"]
 
     logger.warning(
         "Admin spoof: admin=%s target=%s",
@@ -174,7 +170,11 @@ async def spoof_user(
         target_user.email,
     )
 
-    return {"access_token": spoof_token, "token_type": "bearer"}
+    return {
+        "access_token": spoof_token,
+        "refresh_token": refresh,
+        "token_type": "bearer",
+    }
 
 
 @router.get("/me", response_model=UserSchema)

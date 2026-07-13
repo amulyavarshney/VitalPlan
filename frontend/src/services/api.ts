@@ -29,10 +29,33 @@ api.interceptors.request.use((config) => {
 
 api.interceptors.response.use(
   (response) => response,
-  (error: AxiosError) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('access_token');
-      window.dispatchEvent(new Event('auth:logout'));
+  async (error: AxiosError) => {
+    const original = error.config as typeof error.config & { _retry?: boolean };
+    if (error.response?.status === 401 && original && !original._retry) {
+      const refreshToken = localStorage.getItem('refresh_token');
+      if (refreshToken) {
+        original._retry = true;
+        try {
+          const refreshed = await axios.post(`${API_BASE_URL}/auth/refresh`, {
+            refresh_token: refreshToken,
+          });
+          const { access_token, refresh_token } = refreshed.data;
+          localStorage.setItem('access_token', access_token);
+          if (refresh_token) {
+            localStorage.setItem('refresh_token', refresh_token);
+          }
+          original.headers = original.headers || {};
+          original.headers.Authorization = `Bearer ${access_token}`;
+          return api(original);
+        } catch {
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('refresh_token');
+          window.dispatchEvent(new Event('auth:logout'));
+        }
+      } else {
+        localStorage.removeItem('access_token');
+        window.dispatchEvent(new Event('auth:logout'));
+      }
     }
     return Promise.reject(error);
   }
@@ -85,7 +108,19 @@ export const authAPI = {
   },
   login: async (credentials: { email: string; password: string }) => {
     const response = await api.post('/auth/login', credentials);
-    return response.data as { access_token: string; token_type: string };
+    return response.data as {
+      access_token: string;
+      refresh_token?: string;
+      token_type: string;
+    };
+  },
+  refresh: async (refreshToken: string) => {
+    const response = await api.post('/auth/refresh', { refresh_token: refreshToken });
+    return response.data as {
+      access_token: string;
+      refresh_token?: string;
+      token_type: string;
+    };
   },
 };
 
@@ -167,7 +202,7 @@ export const scannerAPI = {
   },
   scanBarcode: async (barcode: string) => {
     const response = await api.post(`/scanner/barcode/${barcode}`);
-    return keysToCamel(response.data);
+    return keysToCamel<ScannedFood & { foodName: string; servingSize: string; imageProcessed?: boolean }>(response.data);
   },
 };
 

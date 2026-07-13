@@ -1,5 +1,5 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Camera, Scan, Upload, X, Info, Zap, Apple, RotateCcw, FlashlightOff as FlashOff, Slash as Flash } from 'lucide-react';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { Camera, Scan, Upload, X, Info, Zap, Apple, RotateCcw, FlashlightOff as FlashOff, Slash as Flash, Barcode } from 'lucide-react';
 import type { ScannedFood } from '../../types';
 import { scannerAPI, getApiErrorMessage } from '../../services/api';
 
@@ -55,6 +55,7 @@ export default function FoodScanner({ onAddToCart }: FoodScannerProps) {
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
   const [flashEnabled, setFlashEnabled] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [barcode, setBarcode] = useState('');
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -150,6 +151,26 @@ export default function FoodScanner({ onAddToCart }: FoodScannerProps) {
       }
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleBarcodeLookup = async () => {
+    const cleaned = barcode.trim();
+    if (cleaned.length < 8) {
+      setError('Enter a valid barcode (at least 8 digits)');
+      return;
+    }
+
+    setIsProcessing(true);
+    setError(null);
+    try {
+      const analysis = await scannerAPI.scanBarcode(cleaned);
+      setScannedFood(mapAnalysisToScannedFood(analysis));
+    } catch (err) {
+      console.error('Error looking up barcode:', err);
+      setError(getApiErrorMessage(err, 'Barcode lookup failed. Please try again.'));
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const switchCamera = () => {
@@ -320,6 +341,36 @@ export default function FoodScanner({ onAddToCart }: FoodScannerProps) {
                   className="hidden"
                 />
               </button>
+
+              {/* Barcode Lookup */}
+              <div className="p-6 sm:p-8 border-2 border-dashed border-gray-300 rounded-2xl">
+                <div className="text-center mb-4">
+                  <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-purple-100 rounded-2xl mb-4">
+                    <Barcode className="w-6 h-6 sm:w-8 sm:h-8 text-purple-600" />
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">Lookup by Barcode</h3>
+                  <p className="text-gray-600 text-sm sm:text-base mb-4">
+                    Enter a product barcode to fetch nutrition from Open Food Facts
+                  </p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={barcode}
+                    onChange={(e) => setBarcode(e.target.value)}
+                    placeholder="e.g. 3017620422003"
+                    className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleBarcodeLookup}
+                    className="inline-flex items-center justify-center px-5 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors"
+                  >
+                    Look up
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -328,11 +379,17 @@ export default function FoodScanner({ onAddToCart }: FoodScannerProps) {
         {scannedFood && (
           <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
             <div className="relative">
-              <img
-                src={scannedFood.imageUrl}
-                alt={scannedFood.name}
-                className="w-full h-48 sm:h-64 object-cover"
-              />
+              {(scannedFood.imageUrl || scannedFood.imageData) ? (
+                <img
+                  src={scannedFood.imageUrl || scannedFood.imageData}
+                  alt={scannedFood.name}
+                  className="w-full h-48 sm:h-64 object-cover"
+                />
+              ) : (
+                <div className="w-full h-48 sm:h-64 bg-gradient-to-br from-emerald-100 to-blue-100 flex items-center justify-center">
+                  <Apple className="w-16 h-16 text-emerald-500" />
+                </div>
+              )}
               <button
                 onClick={resetScanner}
                 className="absolute top-4 right-4 w-8 h-8 bg-white rounded-full flex items-center justify-center text-gray-600 hover:bg-gray-50"

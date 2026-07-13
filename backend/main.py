@@ -1,33 +1,58 @@
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.middleware.base import BaseHTTPMiddleware
+import time
 import uvicorn
 import logging
 
 from routers import auth, users, goals, diet_plans, marketplace, scanner, orders, admin
 from config import settings
 from services.database import engine, Base
+from services.storage_service import resolve_upload_path
+import models.user  # noqa: F401
+import models.goal  # noqa: F401
+import models.diet_plan  # noqa: F401
+import models.order  # noqa: F401
+import models.scanned_food  # noqa: F401
+import models.marketplace_item  # noqa: F401
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
 )
 logger = logging.getLogger(__name__)
 
-# Create database tables (Alembic is preferred for production schema changes)
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="VitalPlan API",
     description="AI-Powered Diet Guide and Nutrition Tracker Backend",
-    version="1.0.0",
+    version="1.1.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
 )
 
+
+class RequestLoggingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        started = time.perf_counter()
+        response = await call_next(request)
+        duration_ms = (time.perf_counter() - started) * 1000
+        logger.info(
+            "%s %s -> %s (%.1fms)",
+            request.method,
+            request.url.path,
+            response.status_code,
+            duration_ms,
+        )
+        response.headers["X-Response-Time-ms"] = f"{duration_ms:.1f}"
+        return response
+
+
+app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_HOSTS,
@@ -93,13 +118,28 @@ app.include_router(scanner.router, prefix="/api/scanner", tags=["Food Scanner"])
 app.include_router(orders.router, prefix="/api/orders", tags=["Orders"])
 
 
+@app.get("/api/uploads/{subdir}/{filename}")
+async def serve_upload(subdir: str, filename: str):
+    path = resolve_upload_path(f"{subdir}/{filename}")
+    if not path:
+        return JSONResponse(status_code=404, content={"error": {"message": "File not found"}})
+    return FileResponse(path)
+
+
 @app.get("/api/health")
 async def health_check():
-    """Health check endpoint"""
+    """Health check endpoint with light diagnostics"""
     return {
         "status": "healthy",
         "message": "VitalPlan API is running",
         "environment": settings.ENVIRONMENT,
+        "version": "1.1.0",
+        "features": {
+            "refresh_tokens": True,
+            "barcode_lookup": True,
+            "marketplace_db": True,
+            "image_uploads": True,
+        },
     }
 
 
@@ -108,7 +148,7 @@ async def root():
     """Root endpoint"""
     return {
         "message": "Welcome to VitalPlan API",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "docs": "/api/docs",
     }
 
