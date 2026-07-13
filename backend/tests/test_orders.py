@@ -22,6 +22,7 @@ def test_create_and_list_orders(client, auth_headers):
     body = create.json()
     assert body["order_id"] >= 1
     assert body["status"] == "pending"
+    assert body["payment"]["provider"] == "demo"
 
     listed = client.get("/api/orders/", headers=auth_headers)
     assert listed.status_code == 200

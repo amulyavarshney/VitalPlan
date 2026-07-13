@@ -98,6 +98,10 @@ export interface Order {
   vendor: 'amazon' | 'walmart' | 'local' | string;
   deliveryAddress?: string;
   paymentMethod?: string;
+  paymentStatus?: 'unpaid' | 'requires_action' | 'paid' | 'failed' | string;
+  paymentIntentId?: string;
+  paymentProvider?: string;
+  paidAt?: Date | string;
 }
 
 export interface OrderItem {

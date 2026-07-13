@@ -125,6 +125,12 @@ async def get_current_admin_user(
     return current_user
 
 
+def create_password_reset_token(email: str) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(hours=1)
+    to_encode = {"sub": email, "exp": expire, "type": "password_reset"}
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+
 def create_spoof_token(admin_email: str, target_email: str, expires_delta: Optional[timedelta] = None):
     """Create a JWT token for spoofing another user"""
     to_encode = {

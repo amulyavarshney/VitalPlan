@@ -122,6 +122,17 @@ export const authAPI = {
       token_type: string;
     };
   },
+  requestPasswordReset: async (email: string) => {
+    const response = await api.post('/auth/password-reset/request', { email });
+    return response.data as { message: string; reset_token?: string; note?: string };
+  },
+  confirmPasswordReset: async (token: string, newPassword: string) => {
+    const response = await api.post('/auth/password-reset/confirm', {
+      token,
+      new_password: newPassword,
+    });
+    return response.data as { message: string };
+  },
 };
 
 export const usersAPI = {
@@ -246,7 +257,25 @@ export const ordersAPI = {
     paymentMethod?: string;
   }) => {
     const response = await api.post('/orders/', keysToSnake(orderData));
-    return response.data as { message: string; order_id: number; status: string };
+    return response.data as {
+      message: string;
+      order_id: number;
+      status: string;
+      payment_status: string;
+      payment: {
+        provider: string;
+        payment_intent_id: string;
+        client_secret?: string;
+        publishable_key?: string;
+        status: string;
+      };
+    };
+  },
+  payOrder: async (orderId: number, paymentIntentId?: string) => {
+    const response = await api.post(`/orders/${orderId}/pay`, {
+      payment_intent_id: paymentIntentId,
+    });
+    return keysToCamel<Order>(response.data);
   },
   getOrders: async () => {
     const response = await api.get('/orders/');

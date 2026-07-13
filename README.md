@@ -152,6 +152,9 @@ Once the backend is running, visit:
 ### Authentication
 - `POST /api/auth/register` - Register new user
 - `POST /api/auth/login` - User login
+- `POST /api/auth/refresh` - Refresh access token
+- `POST /api/auth/password-reset/request` - Request password reset
+- `POST /api/auth/password-reset/confirm` - Confirm password reset
 - `POST /api/auth/token` - OAuth2 token endpoint
 
 ### User Management
@@ -174,7 +177,8 @@ Once the backend is running, visit:
 - `GET /api/marketplace/items` - Get marketplace items
 - `POST /api/marketplace/admin/items` - Create product (admin)
 - `PUT /api/marketplace/admin/items/{id}` - Update product (admin)
-- `POST /api/orders` - Create new order
+- `POST /api/orders` - Create order + payment intent
+- `POST /api/orders/{id}/pay` - Confirm payment (demo or Stripe)
 - `GET /api/orders` - Get user orders
 
 ## Environment Variables

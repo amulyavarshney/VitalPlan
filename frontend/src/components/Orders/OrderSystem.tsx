@@ -269,8 +269,11 @@ export default function OrderSystem({ cartItems, onUpdateCart, onPlaceOrder, use
               }`}
             >
               <Package className="w-5 h-5 mr-2" />
-              {isPlacing ? 'Placing Order...' : 'Place Order'}
+              {isPlacing ? 'Processing payment...' : 'Place Order & Pay'}
             </button>
+            <p className="text-xs text-gray-500 mt-3 text-center">
+              Demo payments confirm instantly. Configure Stripe keys for live card processing.
+            </p>
             {error && <p className="text-sm text-red-600 mt-3 text-center">{error}</p>}
           </div>
         </div>

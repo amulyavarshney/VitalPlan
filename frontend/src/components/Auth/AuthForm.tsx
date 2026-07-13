@@ -1,30 +1,35 @@
 import { useState, type FormEvent } from 'react';
 import { Heart, Loader, Mail, Lock, User as UserIcon } from 'lucide-react';
 import { useAuth, getApiErrorMessage } from '../../hooks/useAuth';
+import { authAPI } from '../../services/api';
 
 interface AuthFormProps {
-  initialMode?: 'login' | 'register';
+  initialMode?: 'login' | 'register' | 'reset';
   onSuccess?: () => void;
 }
 
 export default function AuthForm({ initialMode = 'login', onSuccess }: AuthFormProps) {
   const { login, register } = useAuth();
-  const [mode, setMode] = useState<'login' | 'register'>(initialMode);
+  const [mode, setMode] = useState<'login' | 'register' | 'reset'>(initialMode);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [resetToken, setResetToken] = useState('');
+  const [info, setInfo] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
+    setInfo(null);
     setIsSubmitting(true);
 
     try {
       if (mode === 'login') {
         await login(email, password);
-      } else {
+        onSuccess?.();
+      } else if (mode === 'register') {
         if (!name.trim()) {
           setError('Name is required');
           setIsSubmitting(false);
@@ -36,10 +41,23 @@ export default function AuthForm({ initialMode = 'login', onSuccess }: AuthFormP
           return;
         }
         await register({ name: name.trim(), email, password });
+        onSuccess?.();
+      } else if (!resetToken) {
+        const result = await authAPI.requestPasswordReset(email);
+        setInfo(result.message);
+        if (result.reset_token) {
+          setResetToken(result.reset_token);
+          setInfo(`${result.message} Dev token ready — enter a new password below.`);
+        }
+      } else {
+        await authAPI.confirmPasswordReset(resetToken, password);
+        setInfo('Password updated. You can sign in now.');
+        setMode('login');
+        setResetToken('');
+        setPassword('');
       }
-      onSuccess?.();
     } catch (err) {
-      setError(getApiErrorMessage(err, mode === 'login' ? 'Login failed' : 'Registration failed'));
+      setError(getApiErrorMessage(err, 'Authentication failed'));
     } finally {
       setIsSubmitting(false);
     }
@@ -53,12 +71,14 @@ export default function AuthForm({ initialMode = 'login', onSuccess }: AuthFormP
             <Heart className="w-6 h-6 text-white" />
           </div>
           <h2 className="text-2xl font-bold text-gray-900">
-            {mode === 'login' ? 'Welcome back' : 'Create your account'}
+            {mode === 'login' && 'Welcome back'}
+            {mode === 'register' && 'Create your account'}
+            {mode === 'reset' && 'Reset your password'}
           </h2>
           <p className="text-gray-600 mt-2">
-            {mode === 'login'
-              ? 'Sign in to access your personalized nutrition plan'
-              : 'Start your personalized nutrition journey'}
+            {mode === 'login' && 'Sign in to access your personalized nutrition plan'}
+            {mode === 'register' && 'Start your personalized nutrition journey'}
+            {mode === 'reset' && 'We will help you set a new password'}
           </p>
         </div>
 
@@ -95,25 +115,34 @@ export default function AuthForm({ initialMode = 'login', onSuccess }: AuthFormP
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-            <div className="relative">
-              <Lock className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                placeholder="••••••••"
-                required
-                minLength={6}
-              />
+          {(mode !== 'reset' || !!resetToken) && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {mode === 'reset' ? 'New password' : 'Password'}
+              </label>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  placeholder="••••••••"
+                  required={mode !== 'reset' || !!resetToken}
+                  minLength={6}
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           {error && (
             <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
               {error}
+            </div>
+          )}
+          {info && (
+            <div className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3">
+              {info}
             </div>
           )}
 
@@ -123,23 +152,60 @@ export default function AuthForm({ initialMode = 'login', onSuccess }: AuthFormP
             className="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-blue-500 text-white font-medium py-3 rounded-xl hover:opacity-95 disabled:opacity-60 transition"
           >
             {isSubmitting && <Loader className="w-4 h-4 animate-spin" />}
-            {mode === 'login' ? 'Sign in' : 'Create account'}
+            {mode === 'login' && 'Sign in'}
+            {mode === 'register' && 'Create account'}
+            {mode === 'reset' && (!resetToken ? 'Send reset link' : 'Update password')}
           </button>
         </form>
 
-        <p className="text-center text-sm text-gray-600 mt-6">
-          {mode === 'login' ? "Don't have an account?" : 'Already have an account?'}{' '}
-          <button
-            type="button"
-            onClick={() => {
-              setMode(mode === 'login' ? 'register' : 'login');
-              setError(null);
-            }}
-            className="text-emerald-600 font-medium hover:underline"
-          >
-            {mode === 'login' ? 'Sign up' : 'Sign in'}
-          </button>
-        </p>
+        <div className="text-center text-sm text-gray-600 mt-6 space-y-2">
+          {mode === 'login' && (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('reset');
+                  setError(null);
+                  setInfo(null);
+                }}
+                className="text-emerald-600 font-medium hover:underline block w-full"
+              >
+                Forgot password?
+              </button>
+              <p>
+                Don&apos;t have an account?{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('register');
+                    setError(null);
+                    setInfo(null);
+                  }}
+                  className="text-emerald-600 font-medium hover:underline"
+                >
+                  Sign up
+                </button>
+              </p>
+            </>
+          )}
+          {mode !== 'login' && (
+            <p>
+              Remembered your password?{' '}
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('login');
+                  setError(null);
+                  setInfo(null);
+                  setResetToken('');
+                }}
+                className="text-emerald-600 font-medium hover:underline"
+              >
+                Sign in
+              </button>
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

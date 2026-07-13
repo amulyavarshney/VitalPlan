@@ -39,6 +39,11 @@ class Settings(BaseSettings):
 
     # Open Food Facts
     OPEN_FOOD_FACTS_USER_AGENT: str = "VitalPlan/1.0 (contact: support@vitalplan.local)"
+
+    # Payments (optional — demo mode when unset)
+    STRIPE_SECRET_KEY: str = ""
+    STRIPE_PUBLISHABLE_KEY: str = ""
+    FRONTEND_URL: str = "http://localhost:5173"
     
     # Azure OpenAI
     AZURE_OPENAI_API_KEY: str = ""

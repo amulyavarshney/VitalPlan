@@ -31,6 +31,18 @@ class OrderStatusUpdate(BaseModel):
     status: Literal["pending", "processing", "shipped", "delivered"]
 
 
+class OrderPayRequest(BaseModel):
+    payment_intent_id: Optional[str] = None
+
+
+class PaymentInfo(BaseModel):
+    provider: str
+    payment_intent_id: str
+    client_secret: Optional[str] = None
+    publishable_key: Optional[str] = None
+    status: str
+
+
 class Order(BaseModel):
     id: int
     user_id: int
@@ -40,6 +52,10 @@ class Order(BaseModel):
     vendor: str
     delivery_address: Optional[str] = None
     payment_method: Optional[str] = None
+    payment_status: Optional[str] = "unpaid"
+    payment_intent_id: Optional[str] = None
+    payment_provider: Optional[str] = None
+    paid_at: Optional[datetime] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
 
@@ -51,3 +67,5 @@ class OrderCreateResponse(BaseModel):
     message: str
     order_id: int
     status: str
+    payment_status: str
+    payment: PaymentInfo

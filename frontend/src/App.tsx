@@ -145,14 +145,23 @@ function AppContent() {
         paymentMethod: orderData.paymentMethod || 'card',
       });
 
+      const paid = await ordersAPI.payOrder(result.order_id, result.payment.payment_intent_id);
+
       const newOrder: Order = {
         ...orderData,
         id: result.order_id,
         createdAt: new Date(),
-        status: (result.status as Order['status']) || 'pending',
+        status: (paid.status as Order['status']) || 'processing',
+        paymentStatus: paid.paymentStatus || 'paid',
+        paymentIntentId: paid.paymentIntentId,
+        paymentProvider: paid.paymentProvider,
       };
       setOrders((prev) => [newOrder, ...prev]);
-      showMessage('Order placed successfully');
+      showMessage(
+        result.payment.provider === 'demo'
+          ? 'Order placed and paid (demo payment)'
+          : 'Order placed and payment confirmed'
+      );
     } catch (error) {
       showMessage(getApiErrorMessage(error, 'Failed to place order'));
       throw error;

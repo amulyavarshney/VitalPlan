@@ -1,12 +1,21 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
+from datetime import datetime, timezone
 
 from services.database import get_db
 from services.auth_service import get_current_user
+from services.payment_service import create_payment_intent, confirm_payment
 from models.user import User
 from models.order import Order
-from schemas.order import OrderCreate, Order as OrderSchema, OrderStatusUpdate, OrderCreateResponse
+from schemas.order import (
+    OrderCreate,
+    Order as OrderSchema,
+    OrderStatusUpdate,
+    OrderCreateResponse,
+    OrderPayRequest,
+    PaymentInfo,
+)
 
 router = APIRouter()
 
@@ -17,7 +26,7 @@ async def create_order(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Create a new order"""
+    """Create a new order and initialize payment."""
     try:
         db_order = Order(
             user_id=current_user.id,
@@ -27,9 +36,22 @@ async def create_order(
             delivery_address=order_data.delivery_address,
             payment_method=order_data.payment_method,
             status="pending",
+            payment_status="unpaid",
         )
 
         db.add(db_order)
+        db.commit()
+        db.refresh(db_order)
+
+        payment = await create_payment_intent(
+            amount=order_data.total,
+            order_id=db_order.id,
+            customer_email=current_user.email,
+        )
+
+        db_order.payment_intent_id = payment["payment_intent_id"]
+        db_order.payment_provider = payment["provider"]
+        db_order.payment_status = "requires_action"
         db.commit()
         db.refresh(db_order)
 
@@ -37,12 +59,60 @@ async def create_order(
             message="Order created successfully",
             order_id=db_order.id,
             status=db_order.status,
+            payment_status=db_order.payment_status,
+            payment=PaymentInfo(
+                provider=payment["provider"],
+                payment_intent_id=payment["payment_intent_id"],
+                client_secret=payment.get("client_secret"),
+                publishable_key=payment.get("publishable_key"),
+                status=payment["status"],
+            ),
         )
     except Exception as e:
         raise HTTPException(
             status_code=500,
             detail=f"Failed to create order: {str(e)}",
         )
+
+
+@router.post("/{order_id}/pay", response_model=OrderSchema)
+async def pay_order(
+    order_id: int,
+    payload: OrderPayRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Confirm payment for an order (demo auto-succeeds; Stripe verifies intent)."""
+    order = (
+        db.query(Order)
+        .filter(Order.id == order_id, Order.user_id == current_user.id)
+        .first()
+    )
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    if order.payment_status == "paid":
+        return order
+
+    intent_id = payload.payment_intent_id or order.payment_intent_id
+    if not intent_id:
+        raise HTTPException(status_code=400, detail="Missing payment intent")
+
+    try:
+        result = await confirm_payment(intent_id)
+    except Exception as exc:
+        order.payment_status = "failed"
+        db.commit()
+        raise HTTPException(status_code=402, detail=str(exc))
+
+    order.payment_status = "paid"
+    order.payment_intent_id = result["payment_intent_id"]
+    order.payment_provider = result["provider"]
+    order.paid_at = datetime.now(timezone.utc)
+    order.status = "processing"
+    db.commit()
+    db.refresh(order)
+    return order
 
 
 @router.get("/", response_model=List[OrderSchema])
