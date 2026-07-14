@@ -87,6 +87,8 @@ Frontend E2E smoke: `cd frontend && npm run test:e2e`.
 - Email verification is always required in production; configure SMTP
 - Admin registration uses `X-Admin-Secret` after the first bootstrap admin in development
 - Order totals are computed server-side (subtotal + vendor delivery fee + 8% tax)
+- `DELETE /api/users/me` permanently erases account data after password confirmation
+- API responses set a tight CSP; the frontend nginx image adds SPA-oriented CSP + framing headers
 
 ## Key API endpoints
 
@@ -96,7 +98,7 @@ Frontend E2E smoke: `cd frontend && npm run test:e2e`.
 - `POST /api/auth/password-reset/request` · `POST /api/auth/password-reset/confirm`
 
 ### Users / admin
-- `GET|PUT|DELETE /api/users/me` · `GET /api/users/me/export`
+- `GET|PUT /api/users/me` · `GET /api/users/me/export` · `DELETE /api/users/me` (body: `{ "password" }`)
 - `GET /api/admin/users` · `PATCH /api/admin/users/{id}`
 - Marketplace admin CRUD under `/api/marketplace/admin/items`
 

@@ -194,7 +194,8 @@ export const usersAPI = {
     const response = await api.get('/users/me/export');
     return response.data as Record<string, unknown>;
   },
-  deleteAccount: () => api.delete('/users/me'),
+  deleteAccount: (password: string) =>
+    api.delete('/users/me', { data: { password } }),
 };
 
 export const goalsAPI = {

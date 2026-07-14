@@ -1,12 +1,13 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from services.database import get_db
-from services.auth_service import get_current_user
+from services.auth_service import get_current_user, verify_password
+from services.account_deletion import permanently_delete_user
 from services.data_export import export_user_data
 from models.user import User
-from schemas.user import User as UserSchema, UserUpdate
+from schemas.user import AccountDeleteRequest, User as UserSchema, UserUpdate
 
 router = APIRouter()
 
@@ -51,11 +52,15 @@ async def update_current_user(
 
 @router.delete("/me")
 async def delete_current_user(
+    payload: AccountDeleteRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Deactivate current user account"""
-    current_user.is_active = False
-    db.commit()
-
-    return {"message": "Account deactivated successfully"}
+    """Permanently erase the signed-in account and related data (GDPR erasure)."""
+    if not verify_password(payload.password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect password",
+        )
+    permanently_delete_user(db, current_user)
+    return {"message": "Account permanently deleted"}

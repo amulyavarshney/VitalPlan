@@ -45,6 +45,7 @@ export default function ProfileForm({ user, onSave, onNext }: ProfileFormProps) 
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deletePassword, setDeletePassword] = useState('');
 
   const dietaryOptions = [
     'Vegetarian', 'Vegan', 'Keto', 'Paleo', 'Mediterranean', 
@@ -477,20 +478,32 @@ export default function ProfileForm({ user, onSave, onNext }: ProfileFormProps) 
             <div className="p-4 border border-red-100 rounded-xl bg-red-50/50">
               <h3 className="text-sm font-semibold text-red-800 mb-1">Delete account</h3>
               <p className="text-sm text-red-700 mb-3">
-                Deactivates your account. You will be signed out and unable to log in.
+                Permanently erases your profile, goals, plans, orders, and scan history. This cannot be undone.
               </p>
+              <label className="block text-sm text-red-800 mb-1" htmlFor="delete-password">
+                Confirm with your password
+              </label>
+              <input
+                id="delete-password"
+                type="password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full max-w-sm mb-3 px-3 py-2 text-sm border border-red-200 rounded-lg bg-white focus:ring-2 focus:ring-red-300 focus:border-red-300"
+                autoComplete="current-password"
+              />
               {deleteError && <p className="text-sm text-red-600 mb-2">{deleteError}</p>}
               <button
                 type="button"
-                disabled={isDeleting}
+                disabled={isDeleting || !deletePassword}
                 onClick={async () => {
-                  if (!window.confirm('Delete your VitalPlan account? This cannot be undone from the app.')) {
+                  if (!window.confirm('Permanently delete your VitalPlan account and all data?')) {
                     return;
                   }
                   setIsDeleting(true);
                   setDeleteError(null);
                   try {
-                    await usersAPI.deleteAccount();
+                    await usersAPI.deleteAccount(deletePassword);
                     logout();
                     navigate('/');
                   } catch (err) {

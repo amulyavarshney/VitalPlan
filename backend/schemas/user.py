@@ -79,6 +79,12 @@ class UserLogin(BaseModel):
     password: str
 
 
+class AccountDeleteRequest(BaseModel):
+    """Password confirmation required for irreversible account erasure."""
+
+    password: str = Field(min_length=1, max_length=128)
+
+
 class Token(BaseModel):
     access_token: str
     token_type: str

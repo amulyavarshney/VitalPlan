@@ -47,7 +47,7 @@ if settings.ENVIRONMENT != "production":
 app = FastAPI(
     title="VitalPlan API",
     description="AI-Powered Diet Guide and Nutrition Tracker Backend",
-    version="1.3.0",
+    version="1.4.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
 )
@@ -75,6 +75,10 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"] = "camera=(self), microphone=(), geolocation=()"
         response.headers["X-XSS-Protection"] = "0"
+        # API responses are JSON; keep CSP tight and block framing.
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+        )
         if settings.ENVIRONMENT == "production":
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         return response
@@ -165,7 +169,7 @@ async def health_check():
         content={
             **report,
             "environment": settings.ENVIRONMENT,
-            "version": "1.3.0",
+            "version": "1.4.0",
             "features": {
                 "refresh_tokens": True,
                 "barcode_lookup": True,
@@ -185,7 +189,7 @@ async def root():
     """Root endpoint"""
     return {
         "message": "Welcome to VitalPlan API",
-        "version": "1.3.0",
+        "version": "1.4.0",
         "docs": "/api/docs",
     }
 
