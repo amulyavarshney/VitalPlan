@@ -131,6 +131,19 @@ def create_password_reset_token(email: str) -> str:
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
+def create_email_verification_token(email: str) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(hours=24)
+    to_encode = {"sub": email, "exp": expire, "type": "email_verification"}
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+
+def email_verification_required() -> bool:
+    """Production always requires verification; otherwise honor the config flag."""
+    if settings.ENVIRONMENT == "production":
+        return True
+    return bool(settings.EMAIL_VERIFICATION_REQUIRED)
+
+
 def create_spoof_token(admin_email: str, target_email: str, expires_delta: Optional[timedelta] = None):
     """Create a JWT token for spoofing another user"""
     to_encode = {

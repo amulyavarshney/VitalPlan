@@ -61,6 +61,31 @@ def send_email(
         raise
 
 
+def send_verification_email(*, to_email: str, verification_token: str) -> dict:
+    verify_url = f"{settings.FRONTEND_URL.rstrip('/')}/verify-email?token={verification_token}"
+    subject = "Verify your VitalPlan email"
+    text_body = (
+        "Welcome to VitalPlan!\n\n"
+        f"Confirm your email address by opening this link (expires in 24 hours):\n{verify_url}\n\n"
+        "If you did not create an account, you can ignore this email."
+    )
+    html_body = f"""
+    <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111827;">
+      <h2 style="color: #059669;">Verify your VitalPlan email</h2>
+      <p>Thanks for signing up. Confirm your email to start using VitalPlan.</p>
+      <p>
+        <a href="{verify_url}"
+           style="display:inline-block;background:#059669;color:#fff;padding:12px 18px;border-radius:10px;text-decoration:none;">
+          Verify email
+        </a>
+      </p>
+      <p style="color:#6b7280;font-size:14px;">This link expires in 24 hours.</p>
+      <p style="color:#9ca3af;font-size:12px;word-break:break-all;">{verify_url}</p>
+    </div>
+    """
+    return send_email(to_email=to_email, subject=subject, text_body=text_body, html_body=html_body)
+
+
 def send_password_reset_email(*, to_email: str, reset_token: str) -> dict:
     reset_url = f"{settings.FRONTEND_URL.rstrip('/')}/reset-password?token={reset_token}"
     subject = "Reset your VitalPlan password"

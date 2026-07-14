@@ -44,12 +44,29 @@ class UserUpdate(BaseModel):
 class User(UserBase):
     id: int
     is_active: bool
+    is_verified: bool = True
     is_admin: bool = False
     created_at: datetime
     updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
+
+
+class RegisterResponse(User):
+    verification_required: bool = False
+    verification_token: Optional[str] = None
+    verification_url: Optional[str] = None
+    delivery: Optional[str] = None
+    message: Optional[str] = None
+
+
+class EmailVerificationConfirm(BaseModel):
+    token: str
+
+
+class EmailVerificationResend(BaseModel):
+    email: EmailStr
 
 
 class UserLogin(BaseModel):

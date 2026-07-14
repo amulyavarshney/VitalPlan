@@ -1,5 +1,12 @@
 import React, { useState, useEffect, createContext, useContext, useCallback } from 'react';
-import { authAPI, usersAPI, getApiErrorMessage, type AuthUser, type RegisterPayload } from '../services/api';
+import {
+  authAPI,
+  usersAPI,
+  getApiErrorMessage,
+  type AuthUser,
+  type RegisterPayload,
+  type RegisterResult,
+} from '../services/api';
 import type { User } from '../types';
 
 interface AuthContextType {
@@ -7,7 +14,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (userData: RegisterPayload) => Promise<void>;
+  register: (userData: RegisterPayload) => Promise<RegisterResult>;
   logout: () => void;
   updateProfile: (userData: Partial<RegisterPayload>) => Promise<void>;
   toAppUser: () => User | null;
@@ -87,8 +94,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const register = async (userData: RegisterPayload) => {
-    await authAPI.register(userData);
-    await login(userData.email, userData.password);
+    const result = await authAPI.register(userData);
+    if (!result.verificationRequired) {
+      await login(userData.email, userData.password);
+    }
+    return result;
   };
 
   const logout = () => {

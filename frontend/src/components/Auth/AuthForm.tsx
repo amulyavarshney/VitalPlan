@@ -25,6 +25,7 @@ export default function AuthForm({
   const [info, setInfo] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [needsVerification, setNeedsVerification] = useState(false);
 
   useEffect(() => {
     setMode(initialMode);
@@ -38,10 +39,31 @@ export default function AuthForm({
     }
   }, [initialResetToken]);
 
+  const handleResendVerification = async () => {
+    if (!email) {
+      setError('Enter your email first');
+      return;
+    }
+    setError(null);
+    setIsSubmitting(true);
+    try {
+      const result = await authAPI.resendVerification(email);
+      setInfo(result.message);
+      if (result.verification_url) {
+        setInfo(`${result.message} Dev link: ${result.verification_url}`);
+      }
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Unable to resend verification email'));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
     setInfo(null);
+    setNeedsVerification(false);
     setIsSubmitting(true);
 
     try {
@@ -59,8 +81,21 @@ export default function AuthForm({
           setIsSubmitting(false);
           return;
         }
-        await register({ name: name.trim(), email, password });
-        onSuccess?.();
+        const result = await register({ name: name.trim(), email, password });
+        if (result.verificationRequired) {
+          setNeedsVerification(true);
+          setInfo(result.message || 'Check your email to verify your account before signing in.');
+          if (result.verificationUrl) {
+            setInfo(
+              `${result.message || 'Account created.'} Dev verify link ready — open /verify-email or use the emailed link.`
+            );
+          }
+          if (result.delivery === 'console') {
+            setInfo((prev) => `${prev} (Email logged to server console — SMTP not configured.)`);
+          }
+        } else {
+          onSuccess?.();
+        }
       } else if (!resetToken) {
         const result = await authAPI.requestPasswordReset(email);
         setInfo(result.message);
@@ -83,7 +118,11 @@ export default function AuthForm({
         navigate('/login', { replace: true });
       }
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Authentication failed'));
+      const message = getApiErrorMessage(err, 'Authentication failed');
+      setError(message);
+      if (message.toLowerCase().includes('not verified')) {
+        setNeedsVerification(true);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -184,6 +223,17 @@ export default function AuthForm({
             {mode === 'reset' && (!resetToken ? 'Send reset link' : 'Update password')}
           </button>
         </form>
+
+        {needsVerification && (
+          <button
+            type="button"
+            onClick={handleResendVerification}
+            disabled={isSubmitting}
+            className="mt-3 w-full text-sm text-emerald-600 font-medium hover:underline disabled:opacity-60"
+          >
+            Resend verification email
+          </button>
+        )}
 
         <div className="text-center text-sm text-gray-600 mt-6 space-y-2">
           {mode === 'login' && (

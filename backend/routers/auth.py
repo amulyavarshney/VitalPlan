@@ -10,26 +10,39 @@ from services.auth_service import (
     create_token_pair,
     verify_token,
     create_password_reset_token,
+    create_email_verification_token,
+    email_verification_required,
 )
 from services.rate_limit import auth_rate_limiter, password_reset_limiter, client_key
-from services.email_service import send_password_reset_email
+from services.email_service import send_password_reset_email, send_verification_email
 from config import settings
 from models.user import User
 from schemas.user import (
     UserCreate,
     User as UserSchema,
+    RegisterResponse,
     Token,
     UserLogin,
     RefreshRequest,
     PasswordResetRequest,
     PasswordResetConfirm,
+    EmailVerificationConfirm,
+    EmailVerificationResend,
 )
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.post("/register", response_model=UserSchema)
+def _ensure_verified_for_login(user: User) -> None:
+    if email_verification_required() and not user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Email not verified. Check your inbox or request a new verification link.",
+        )
+
+
+@router.post("/register", response_model=RegisterResponse)
 async def register(user: UserCreate, request: Request, db: Session = Depends(get_db)):
     """Register a new user"""
     auth_rate_limiter.check(client_key(request, "register"))
@@ -41,6 +54,7 @@ async def register(user: UserCreate, request: Request, db: Session = Depends(get
             detail="Email already registered",
         )
 
+    require_verification = email_verification_required()
     hashed_password = get_password_hash(user.password)
     db_user = User(
         email=user.email,
@@ -57,13 +71,93 @@ async def register(user: UserCreate, request: Request, db: Session = Depends(get
         bio=user.bio,
         location=user.location,
         is_admin=False,
+        is_verified=not require_verification,
     )
 
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
 
-    return db_user
+    response = RegisterResponse.model_validate(db_user)
+    response.verification_required = require_verification
+
+    if require_verification:
+        token = create_email_verification_token(db_user.email)
+        try:
+            delivery = send_verification_email(to_email=db_user.email, verification_token=token)
+            response.delivery = delivery["mode"]
+        except Exception:
+            logger.exception("Verification email failed for %s", db_user.email)
+            if settings.ENVIRONMENT == "production":
+                raise HTTPException(status_code=500, detail="Unable to send verification email")
+            response.delivery = "failed"
+
+        response.message = "Account created. Please verify your email before signing in."
+        if settings.ENVIRONMENT != "production":
+            response.verification_token = token
+            response.verification_url = (
+                f"{settings.FRONTEND_URL.rstrip('/')}/verify-email?token={token}"
+            )
+    else:
+        response.message = "Account created successfully."
+
+    return response
+
+
+@router.post("/verify-email")
+async def verify_email(
+    payload: EmailVerificationConfirm,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Confirm email ownership with a verification token."""
+    auth_rate_limiter.check(client_key(request, "verify-email"))
+
+    token_data = verify_token(payload.token, expected_type="email_verification")
+    if token_data is None:
+        raise HTTPException(status_code=400, detail="Invalid or expired verification token")
+
+    email = token_data.get("sub")
+    user = db.query(User).filter(User.email == email).first()
+    if not user or not user.is_active:
+        raise HTTPException(status_code=400, detail="Invalid or expired verification token")
+
+    user.is_verified = True
+    db.commit()
+    return {"message": "Email verified successfully. You can sign in now."}
+
+
+@router.post("/verify-email/resend")
+async def resend_verification_email(
+    payload: EmailVerificationResend,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Resend email verification link (always returns a generic message)."""
+    password_reset_limiter.check(client_key(request, "verify-email-resend"))
+
+    response = {
+        "message": "If that email exists and is unverified, a verification link has been sent.",
+    }
+    user = db.query(User).filter(User.email == payload.email).first()
+    if user and user.is_active and not user.is_verified:
+        token = create_email_verification_token(user.email)
+        try:
+            delivery = send_verification_email(to_email=user.email, verification_token=token)
+            response["delivery"] = delivery["mode"]
+        except Exception:
+            logger.exception("Verification resend failed for %s", user.email)
+            if settings.ENVIRONMENT == "production":
+                raise HTTPException(status_code=500, detail="Unable to send verification email")
+            response["delivery"] = "failed"
+
+        if settings.ENVIRONMENT != "production":
+            response["verification_token"] = token
+            response["verification_url"] = (
+                f"{settings.FRONTEND_URL.rstrip('/')}/verify-email?token={token}"
+            )
+
+    return response
 
 
 @router.post("/login", response_model=Token)
@@ -86,6 +180,7 @@ async def login(user_credentials: UserLogin, request: Request, db: Session = Dep
             detail="Inactive user",
         )
 
+    _ensure_verified_for_login(user)
     return create_token_pair(user.email)
 
 
@@ -110,6 +205,7 @@ async def refresh_access_token(payload: RefreshRequest, request: Request, db: Se
             detail="Invalid refresh token",
         )
 
+    _ensure_verified_for_login(user)
     return create_token_pair(user.email)
 
 
@@ -195,4 +291,5 @@ async def login_for_access_token(
             detail="Inactive user",
         )
 
+    _ensure_verified_for_login(user)
     return create_token_pair(user.email)

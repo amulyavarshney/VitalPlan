@@ -101,10 +101,18 @@ export interface RegisterPayload {
   location?: string;
 }
 
+export type RegisterResult = AuthUser & {
+  verificationRequired?: boolean;
+  verificationToken?: string;
+  verificationUrl?: string;
+  delivery?: string;
+  message?: string;
+};
+
 export const authAPI = {
   register: async (userData: RegisterPayload) => {
     const response = await api.post('/auth/register', keysToSnake(userData));
-    return keysToCamel<AuthUser>(response.data);
+    return keysToCamel<RegisterResult>(response.data);
   },
   login: async (credentials: { email: string; password: string }) => {
     const response = await api.post('/auth/login', credentials);
@@ -120,6 +128,19 @@ export const authAPI = {
       access_token: string;
       refresh_token?: string;
       token_type: string;
+    };
+  },
+  verifyEmail: async (token: string) => {
+    const response = await api.post('/auth/verify-email', { token });
+    return response.data as { message: string };
+  },
+  resendVerification: async (email: string) => {
+    const response = await api.post('/auth/verify-email/resend', { email });
+    return response.data as {
+      message: string;
+      verification_token?: string;
+      verification_url?: string;
+      delivery?: string;
     };
   },
   requestPasswordReset: async (email: string) => {

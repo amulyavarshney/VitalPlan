@@ -9,6 +9,7 @@ import OrderSystem from './components/Orders/OrderSystem';
 import Marketplace from './components/Marketplace/Marketplace';
 import FoodScanner from './components/Scanner/FoodScanner';
 import AuthForm from './components/Auth/AuthForm';
+import VerifyEmailPage from './components/Auth/VerifyEmailPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import { useAuth, getApiErrorMessage } from './hooks/useAuth';
 import { goalsAPI, ordersAPI } from './services/api';
@@ -222,6 +223,7 @@ function AppContent() {
           <Route path="/login" element={<AuthPage mode="login" />} />
           <Route path="/register" element={<AuthPage mode="register" />} />
           <Route path="/reset-password" element={<AuthPage mode="reset" />} />
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
           <Route
             path="/profile"
             element={

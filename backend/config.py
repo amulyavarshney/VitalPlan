@@ -54,6 +54,9 @@ class Settings(BaseSettings):
     SMTP_FROM: str = ""
     SMTP_USE_TLS: bool = True
     SMTP_USE_SSL: bool = False
+    # When False (default in development), new users are auto-verified.
+    # Production always requires verification regardless of this flag.
+    EMAIL_VERIFICATION_REQUIRED: bool = False
     
     # Azure OpenAI
     AZURE_OPENAI_API_KEY: str = ""

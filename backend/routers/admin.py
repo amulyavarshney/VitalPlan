@@ -83,6 +83,7 @@ async def register_admin(
         bio=admin.bio,
         location=admin.location,
         is_admin=True,
+        is_verified=True,
     )
 
     db.add(db_user)

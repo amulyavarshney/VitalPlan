@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Camera, Scan, Upload, X, Info, Zap, Apple, RotateCcw, FlashlightOff as FlashOff, Slash as Flash, Barcode } from 'lucide-react';
+import { Camera, Scan, Upload, X, Info, Zap, Apple, RotateCcw, FlashlightOff as FlashOff, Slash as Flash, Barcode, History, RefreshCw } from 'lucide-react';
 import type { ScannedFood } from '../../types';
 import { scannerAPI, getApiErrorMessage } from '../../services/api';
 
@@ -56,10 +56,50 @@ export default function FoodScanner({ onAddToCart }: FoodScannerProps) {
   const [flashEnabled, setFlashEnabled] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [barcode, setBarcode] = useState('');
+  const [history, setHistory] = useState<ScannedFood[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const loadHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    setHistoryError(null);
+    try {
+      const items = await scannerAPI.getHistory(20);
+      setHistory(
+        items.map((item) => ({
+          id: String(item.id),
+          name: item.name,
+          brand: item.brand,
+          barcode: item.barcode || '',
+          calories: item.calories,
+          servingSize: item.servingSize,
+          macros: item.macros || { protein: 0, carbs: 0, fat: 0 },
+          nutritionDetails: {
+            vitamins: item.nutritionDetails?.vitamins || {},
+            minerals: item.nutritionDetails?.minerals || {},
+            fiber: item.nutritionDetails?.fiber || 0,
+            sugar: item.nutritionDetails?.sugar || 0,
+            sodium: item.nutritionDetails?.sodium || 0,
+            cholesterol: item.nutritionDetails?.cholesterol || 0,
+            saturatedFat: item.nutritionDetails?.saturatedFat || 0,
+            transFat: item.nutritionDetails?.transFat || 0,
+          },
+          confidence: item.confidence,
+          aiInsights: item.aiInsights,
+          analyzedAt: item.analyzedAt ? new Date(item.analyzedAt) : new Date(),
+          imageUrl: item.imageUrl,
+        }))
+      );
+    } catch (err) {
+      setHistoryError(getApiErrorMessage(err, 'Failed to load scan history'));
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
 
   const startCamera = useCallback(async () => {
     try {
@@ -123,13 +163,14 @@ export default function FoodScanner({ onAddToCart }: FoodScannerProps) {
       const file = dataUrlToFile(imageData, `scan-${Date.now()}.jpg`);
       const analysis = await scannerAPI.analyzeImage(file);
       setScannedFood(mapAnalysisToScannedFood(analysis, imageData));
+      loadHistory();
     } catch (error) {
       console.error('Error analyzing image:', error);
       setError(getApiErrorMessage(error, 'Failed to analyze image. Please try again.'));
     } finally {
       setIsProcessing(false);
     }
-  }, [stopCamera]);
+  }, [stopCamera, loadHistory]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -143,6 +184,7 @@ export default function FoodScanner({ onAddToCart }: FoodScannerProps) {
       try {
         const analysis = await scannerAPI.analyzeImage(file);
         setScannedFood(mapAnalysisToScannedFood(analysis, imageData));
+        loadHistory();
       } catch (error) {
         console.error('Error analyzing image:', error);
         setError(getApiErrorMessage(error, 'Failed to analyze image. Please try again.'));
@@ -165,6 +207,7 @@ export default function FoodScanner({ onAddToCart }: FoodScannerProps) {
     try {
       const analysis = await scannerAPI.scanBarcode(cleaned);
       setScannedFood(mapAnalysisToScannedFood(analysis));
+      loadHistory();
     } catch (err) {
       console.error('Error looking up barcode:', err);
       setError(getApiErrorMessage(err, 'Barcode lookup failed. Please try again.'));
@@ -200,6 +243,10 @@ export default function FoodScanner({ onAddToCart }: FoodScannerProps) {
       alert('Food added to your meal plan!');
     }
   };
+
+  useEffect(() => {
+    loadHistory();
+  }, [loadHistory]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -520,6 +567,58 @@ export default function FoodScanner({ onAddToCart }: FoodScannerProps) {
                   Scan Another
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Scan history */}
+        {!isScanning && !isProcessing && (
+          <div className="bg-white rounded-2xl shadow-lg p-6 mt-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 inline-flex items-center gap-2">
+                <History className="w-5 h-5 text-emerald-600" />
+                Recent scans
+              </h3>
+              <button
+                type="button"
+                onClick={loadHistory}
+                className="inline-flex items-center gap-2 text-sm text-emerald-600 hover:text-emerald-700"
+              >
+                <RefreshCw className={`w-4 h-4 ${historyLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </button>
+            </div>
+            {historyLoading && <p className="text-sm text-gray-500">Loading history...</p>}
+            {historyError && <p className="text-sm text-red-600 mb-3">{historyError}</p>}
+            {!historyLoading && history.length === 0 && (
+              <p className="text-sm text-gray-500">No scans yet. Capture or look up a food to build your history.</p>
+            )}
+            <div className="space-y-3">
+              {history.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => {
+                    setScannedFood(item);
+                    setError(null);
+                    stopCamera();
+                  }}
+                  className="w-full text-left border border-gray-200 rounded-xl p-4 hover:border-emerald-400 hover:bg-emerald-50/40 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-gray-900">{item.name}</p>
+                      <p className="text-sm text-gray-500">
+                        {item.brand || 'Unknown brand'} · {item.analyzedAt?.toLocaleString?.() || ''}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold text-emerald-600">{item.calories}</p>
+                      <p className="text-xs text-gray-500">cal</p>
+                    </div>
+                  </div>
+                </button>
+              ))}
             </div>
           </div>
         )}
