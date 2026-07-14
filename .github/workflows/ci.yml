@@ -31,19 +31,29 @@ jobs:
         run: pytest -q
 
   frontend:
-    name: Frontend typecheck
+    name: Frontend typecheck and E2E
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - name: Install dependencies
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Install frontend dependencies
         run: npm ci --legacy-peer-deps
       - name: Typecheck
         run: npx tsc -p tsconfig.app.json --noEmit
@@ -53,5 +63,11 @@ jobs:
         run: npm run build
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
-      - name: E2E smoke
+      - name: E2E smoke + checkout
+        env:
+          VITE_API_URL: http://127.0.0.1:8000/api
+          E2E_START_API: "1"
+          ENVIRONMENT: development
+          SECRET_KEY: ci-e2e-secret-key-not-for-production-use
+          DATABASE_URL: sqlite:///./e2e.db
         run: npm run test:e2e

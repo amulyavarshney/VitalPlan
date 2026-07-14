@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+import uuid
+
 from jose import JWTError, jwt
 import bcrypt
 from fastapi import Depends, HTTPException, status
@@ -8,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from config import settings
 from services.database import get_db
+from services.token_revocation import is_jti_revoked
 from models.user import User
 
 security = HTTPBearer()
@@ -37,7 +40,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     else:
         expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
-    to_encode.update({"exp": expire, "type": "access"})
+    to_encode.update({"exp": expire, "type": "access", "jti": uuid.uuid4().hex})
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
@@ -49,7 +52,7 @@ def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None):
     else:
         expire = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
 
-    to_encode.update({"exp": expire, "type": "refresh"})
+    to_encode.update({"exp": expire, "type": "refresh", "jti": uuid.uuid4().hex})
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
@@ -96,6 +99,9 @@ async def get_current_user(
         if payload is None or payload.get("type") == "refresh":
             raise credentials_exception
 
+    if is_jti_revoked(db, payload.get("jti")):
+        raise credentials_exception
+
     email = payload.get("sub")
     if email is None:
         raise credentials_exception
@@ -127,13 +133,18 @@ async def get_current_admin_user(
 
 def create_password_reset_token(email: str) -> str:
     expire = datetime.now(timezone.utc) + timedelta(hours=1)
-    to_encode = {"sub": email, "exp": expire, "type": "password_reset"}
+    to_encode = {"sub": email, "exp": expire, "type": "password_reset", "jti": uuid.uuid4().hex}
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
 def create_email_verification_token(email: str) -> str:
     expire = datetime.now(timezone.utc) + timedelta(hours=24)
-    to_encode = {"sub": email, "exp": expire, "type": "email_verification"}
+    to_encode = {
+        "sub": email,
+        "exp": expire,
+        "type": "email_verification",
+        "jti": uuid.uuid4().hex,
+    }
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
@@ -151,6 +162,7 @@ def create_spoof_token(admin_email: str, target_email: str, expires_delta: Optio
         "admin": admin_email,
         "spoof": True,
         "type": "access",
+        "jti": uuid.uuid4().hex,
     }
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta

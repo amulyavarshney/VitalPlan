@@ -149,6 +149,10 @@ export const authAPI = {
       token_type: string;
     };
   },
+  logout: async (refreshToken: string) => {
+    const response = await api.post('/auth/logout', { refresh_token: refreshToken });
+    return response.data as { message: string };
+  },
   verifyEmail: async (token: string) => {
     const response = await api.post('/auth/verify-email', { token });
     return response.data as { message: string };
@@ -300,9 +304,34 @@ export const marketplaceAPI = {
 };
 
 export const adminAPI = {
-  getUsers: async () => {
-    const response = await api.get('/admin/users');
-    return keysToCamel<AuthUser[]>(response.data);
+  getUsers: async (params?: { limit?: number; offset?: number }) => {
+    const response = await api.get('/admin/users', { params });
+    const data = keysToCamel<{
+      items: AuthUser[];
+      total: number;
+      limit: number;
+      offset: number;
+    }>(response.data);
+    return data;
+  },
+  getAuditLogs: async (params?: { limit?: number; offset?: number; action?: string }) => {
+    const response = await api.get('/admin/audit', { params });
+    return keysToCamel<{
+      items: Array<{
+        id: number;
+        actorUserId?: number | null;
+        actorEmail?: string | null;
+        action: string;
+        resourceType: string;
+        resourceId?: string | null;
+        details?: Record<string, unknown> | null;
+        ipAddress?: string | null;
+        createdAt: string;
+      }>;
+      total: number;
+      limit: number;
+      offset: number;
+    }>(response.data);
   },
   spoofUser: async (userEmail: string) => {
     const response = await api.post('/admin/spoof', { user_email: userEmail });
@@ -400,9 +429,15 @@ export const ordersAPI = {
     });
     return keysToCamel<Order>(response.data);
   },
-  getOrders: async () => {
-    const response = await api.get('/orders/');
-    return keysToCamel<Order[]>(response.data);
+  getOrders: async (params?: { limit?: number; offset?: number }) => {
+    const response = await api.get('/orders/', { params });
+    const data = keysToCamel<{
+      items: Order[];
+      total: number;
+      limit: number;
+      offset: number;
+    }>(response.data);
+    return data.items;
   },
   getOrder: async (orderId: number) => {
     const response = await api.get(`/orders/${orderId}`);

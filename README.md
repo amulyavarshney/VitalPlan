@@ -91,6 +91,8 @@ Frontend E2E smoke: `cd frontend && npm run test:e2e`.
 - API responses set a tight CSP; the frontend nginx image adds SPA-oriented CSP + framing headers
 - Unpaid orders can be cancelled (`POST /api/orders/{id}/cancel`); AI/scanner/order create endpoints are rate-limited
 - Production logging defaults to JSON (`LOG_FORMAT=auto`)
+- Admin audit log (`GET /api/admin/audit`), logout token revocation (`POST /api/auth/logout`), Prometheus `/metrics`
+- Local uploads require signed URLs; account delete purges scan images
 
 ## Key API endpoints
 
@@ -101,13 +103,15 @@ Frontend E2E smoke: `cd frontend && npm run test:e2e`.
 
 ### Users / admin
 - `GET|PUT /api/users/me` · `GET /api/users/me/export` · `DELETE /api/users/me` (body: `{ "password" }`)
-- `GET /api/admin/users` · `PATCH /api/admin/users/{id}`
+- `POST /api/auth/logout` (revokes refresh/access `jti`)
+- `GET /api/admin/users?limit&offset` · `PATCH /api/admin/users/{id}` · `GET /api/admin/audit`
 - Marketplace admin CRUD under `/api/marketplace/admin/items`
+- `GET /metrics` (Prometheus)
 
 ### Plans / scanner / orders
 - `POST /api/diet-plans/generate` · `GET /api/diet-plans`
 - `POST /api/scanner/analyze-image` · `GET /api/scanner/history` · `POST /api/scanner/barcode/{barcode}`
-- `POST /api/orders` · `POST /api/orders/{id}/pay` · `POST /api/orders/{id}/cancel` · `GET /api/orders`
+- `POST /api/orders` · `POST /api/orders/{id}/pay` · `POST /api/orders/{id}/cancel` · `GET /api/orders?limit&offset`
 - `POST /api/webhooks/stripe` (Stripe signature; see webhook docs)
 - `GET /api/health` (DB + Redis probes)
 

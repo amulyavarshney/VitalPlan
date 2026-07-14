@@ -1,10 +1,14 @@
 """Upload storage: local disk by default, optional S3-compatible object storage."""
 from __future__ import annotations
 
+import hashlib
+import hmac
 import logging
+import time
 import uuid
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlencode
 
 from config import settings
 
@@ -80,21 +84,70 @@ def resolve_upload_path(relative_key: Optional[str]) -> Optional[Path]:
     return None
 
 
-def public_upload_url(relative_key: Optional[str]) -> Optional[str]:
+def delete_upload(relative_key: Optional[str]) -> bool:
+    """Best-effort delete of a stored object. Returns True when removed."""
+    if not relative_key:
+        return False
+    key = relative_key.split("?", 1)[0]
+    if key.startswith("/api/uploads/"):
+        key = key[len("/api/uploads/") :]
+    key = key.lstrip("/")
+
+    if s3_enabled():
+        try:
+            _s3_client().delete_object(Bucket=settings.S3_BUCKET, Key=key)
+            return True
+        except Exception:
+            logger.exception("Failed to delete s3 object %s", key)
+            return False
+
+    path = resolve_upload_path(key)
+    if not path:
+        return False
+    try:
+        path.unlink(missing_ok=True)
+        return True
+    except Exception:
+        logger.exception("Failed to delete local upload %s", key)
+        return False
+
+
+def _sign_payload(relative_key: str, exp: int) -> str:
+    message = f"{relative_key}:{exp}".encode("utf-8")
+    return hmac.new(settings.SECRET_KEY.encode("utf-8"), message, hashlib.sha256).hexdigest()
+
+
+def verify_upload_signature(relative_key: str, exp: Optional[str], sig: Optional[str]) -> bool:
+    if not exp or not sig:
+        return False
+    try:
+        exp_int = int(exp)
+    except ValueError:
+        return False
+    if exp_int < int(time.time()):
+        return False
+    expected = _sign_payload(relative_key, exp_int)
+    return hmac.compare_digest(expected, sig)
+
+
+def public_upload_url(relative_key: Optional[str], *, ttl_seconds: int = 86400) -> Optional[str]:
     if not relative_key:
         return None
     if s3_enabled():
         if settings.S3_PUBLIC_BASE_URL:
             return f"{settings.S3_PUBLIC_BASE_URL.rstrip('/')}/{relative_key}"
-        # Presigned GET for private buckets
         try:
             client = _s3_client()
             return client.generate_presigned_url(
                 "get_object",
                 Params={"Bucket": settings.S3_BUCKET, "Key": relative_key},
-                ExpiresIn=3600,
+                ExpiresIn=min(ttl_seconds, 3600),
             )
         except Exception:
             logger.exception("Failed to presign S3 URL for %s", relative_key)
             return None
-    return f"/api/uploads/{relative_key}"
+
+    exp = int(time.time()) + ttl_seconds
+    sig = _sign_payload(relative_key, exp)
+    query = urlencode({"exp": exp, "sig": sig})
+    return f"/api/uploads/{relative_key}?{query}"

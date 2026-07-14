@@ -10,7 +10,10 @@ def test_local_save_upload(tmp_path, monkeypatch):
     key = save_upload(b"hello", "image/jpeg", subdir="scans")
     assert key.startswith("scans/")
     assert (tmp_path / key).read_bytes() == b"hello"
-    assert public_upload_url(key) == f"/api/uploads/{key}"
+    url = public_upload_url(key)
+    assert url is not None
+    assert url.startswith(f"/api/uploads/{key}?")
+    assert "sig=" in url and "exp=" in url
     assert s3_enabled() is False
 
 

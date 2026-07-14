@@ -29,7 +29,9 @@ def test_admin_can_list_and_deactivate_user(client, db_session):
 
     listed = client.get("/api/admin/users", headers=headers)
     assert listed.status_code == 200
-    emails = {u["email"] for u in listed.json()}
+    body = listed.json()
+    assert "items" in body
+    emails = {u["email"] for u in body["items"]}
     assert "member@example.com" in emails
     assert admin.email in emails
 

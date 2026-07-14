@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Package, Users, Plus, RefreshCw, Shield } from 'lucide-react';
+import { Package, Users, Plus, RefreshCw, Shield, ScrollText } from 'lucide-react';
 import {
   adminAPI,
   getApiErrorMessage,
@@ -9,7 +9,16 @@ import {
 } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 
-type Tab = 'products' | 'users';
+type Tab = 'products' | 'users' | 'audit';
+
+type AuditRow = {
+  id: number;
+  actorEmail?: string | null;
+  action: string;
+  resourceType: string;
+  resourceId?: string | null;
+  createdAt: string;
+};
 
 const emptyProductForm = {
   sku: '',
@@ -28,6 +37,9 @@ export default function AdminDashboard() {
   const [tab, setTab] = useState<Tab>('products');
   const [products, setProducts] = useState<AdminMarketplaceItem[]>([]);
   const [users, setUsers] = useState<AuthUser[]>([]);
+  const [usersTotal, setUsersTotal] = useState(0);
+  const [auditLogs, setAuditLogs] = useState<AuditRow[]>([]);
+  const [auditTotal, setAuditTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -41,8 +53,15 @@ export default function AdminDashboard() {
   }, []);
 
   const loadUsers = useCallback(async () => {
-    const data = await adminAPI.getUsers();
-    setUsers(data);
+    const data = await adminAPI.getUsers({ limit: 50, offset: 0 });
+    setUsers(data.items);
+    setUsersTotal(data.total);
+  }, []);
+
+  const loadAudit = useCallback(async () => {
+    const data = await adminAPI.getAuditLogs({ limit: 50, offset: 0 });
+    setAuditLogs(data.items);
+    setAuditTotal(data.total);
   }, []);
 
   const refresh = useCallback(async () => {
@@ -51,15 +70,17 @@ export default function AdminDashboard() {
     try {
       if (tab === 'products') {
         await loadProducts();
-      } else {
+      } else if (tab === 'users') {
         await loadUsers();
+      } else {
+        await loadAudit();
       }
     } catch (err) {
       setError(getApiErrorMessage(err, 'Failed to load admin data'));
     } finally {
       setLoading(false);
     }
-  }, [tab, loadProducts, loadUsers]);
+  }, [tab, loadProducts, loadUsers, loadAudit]);
 
   useEffect(() => {
     refresh();
@@ -186,6 +207,16 @@ export default function AdminDashboard() {
         >
           <Users className="w-4 h-4" />
           Users
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab('audit')}
+          className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium ${
+            tab === 'audit' ? 'bg-emerald-50 text-emerald-700' : 'text-gray-600'
+          }`}
+        >
+          <ScrollText className="w-4 h-4" />
+          Audit
         </button>
       </div>
 
@@ -353,10 +384,10 @@ export default function AdminDashboard() {
             ))}
           </div>
         </div>
-      ) : (
+      ) : tab === 'users' ? (
         <div className="bg-white rounded-2xl shadow-lg p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Users</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Users ({usersTotal})</h2>
             <button
               type="button"
               onClick={refresh}
@@ -422,6 +453,42 @@ export default function AdminDashboard() {
                         {user.isActive ? 'Deactivate' : 'Activate'}
                       </button>
                     )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl shadow-lg p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Audit log ({auditTotal})</h2>
+            <button
+              type="button"
+              onClick={refresh}
+              className="inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+          </div>
+          {loading && <p className="text-sm text-gray-500">Loading audit events...</p>}
+          {!loading && auditLogs.length === 0 && (
+            <p className="text-sm text-gray-500">No audit events yet.</p>
+          )}
+          <div className="space-y-3">
+            {auditLogs.map((entry) => (
+              <div key={entry.id} className="border border-gray-200 rounded-xl p-4 text-sm">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="font-semibold text-gray-900">{entry.action}</p>
+                    <p className="text-gray-600">
+                      {entry.resourceType}
+                      {entry.resourceId ? ` #${entry.resourceId}` : ''}
+                    </p>
+                    <p className="text-gray-500 mt-1">
+                      by {entry.actorEmail || 'unknown'} · {new Date(entry.createdAt).toLocaleString()}
+                    </p>
                   </div>
                 </div>
               </div>

@@ -1,5 +1,6 @@
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Request
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 import logging
 
@@ -15,6 +16,7 @@ from services.auth_service import (
 )
 from services.rate_limit import auth_rate_limiter, password_reset_limiter, client_key
 from services.email_service import send_password_reset_email, send_verification_email
+from services.token_revocation import is_jti_revoked, revoke_token_string
 from config import settings
 from models.user import User
 from schemas.user import (
@@ -29,6 +31,8 @@ from schemas.user import (
     EmailVerificationConfirm,
     EmailVerificationResend,
 )
+
+optional_bearer = HTTPBearer(auto_error=False)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -197,6 +201,13 @@ async def refresh_access_token(payload: RefreshRequest, request: Request, db: Se
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    if is_jti_revoked(db, token_data.get("jti")):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has been revoked",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     email = token_data.get("sub")
     user = db.query(User).filter(User.email == email).first()
     if not user or not user.is_active:
@@ -206,7 +217,25 @@ async def refresh_access_token(payload: RefreshRequest, request: Request, db: Se
         )
 
     _ensure_verified_for_login(user)
+    # Rotate: revoke the presented refresh token
+    revoke_token_string(db, payload.refresh_token)
     return create_token_pair(user.email)
+
+
+@router.post("/logout")
+async def logout(
+    payload: RefreshRequest,
+    db: Session = Depends(get_db),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(optional_bearer),
+):
+    """Revoke the refresh token (and optional access token) for logout."""
+    revoked = revoke_token_string(db, payload.refresh_token)
+    if credentials and credentials.credentials:
+        revoke_token_string(db, credentials.credentials)
+    if not revoked:
+        # Still succeed to avoid leaking token validity
+        return {"message": "Logged out"}
+    return {"message": "Logged out"}
 
 
 @router.post("/password-reset/request")

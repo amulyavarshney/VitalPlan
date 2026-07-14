@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
 from services.database import get_db
 from services.auth_service import get_current_user, get_current_admin_user
+from services.audit_service import log_audit
 from models.user import User
 from models.marketplace_item import MarketplaceItem
 from schemas.marketplace import (
@@ -237,6 +238,7 @@ async def get_recommendations(
 @router.post("/admin/items", response_model=MarketplaceItemSchema)
 async def create_marketplace_item(
     payload: MarketplaceItemCreate,
+    request: Request,
     current_admin: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db),
 ):
@@ -248,6 +250,15 @@ async def create_marketplace_item(
     db.add(item)
     db.commit()
     db.refresh(item)
+    log_audit(
+        db,
+        action="marketplace.create",
+        resource_type="marketplace_item",
+        actor=current_admin,
+        resource_id=str(item.id),
+        details={"sku": item.sku, "name": item.name},
+        request=request,
+    )
     return item
 
 
@@ -255,6 +266,7 @@ async def create_marketplace_item(
 async def update_marketplace_item(
     item_id: int,
     payload: MarketplaceItemUpdate,
+    request: Request,
     current_admin: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db),
 ):
@@ -262,17 +274,28 @@ async def update_marketplace_item(
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
 
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    changes = payload.model_dump(exclude_unset=True)
+    for field, value in changes.items():
         setattr(item, field, value)
 
     db.commit()
     db.refresh(item)
+    log_audit(
+        db,
+        action="marketplace.update",
+        resource_type="marketplace_item",
+        actor=current_admin,
+        resource_id=str(item.id),
+        details={"fields": list(changes.keys())},
+        request=request,
+    )
     return item
 
 
 @router.delete("/admin/items/{item_id}")
 async def delete_marketplace_item(
     item_id: int,
+    request: Request,
     current_admin: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db),
 ):
@@ -281,6 +304,15 @@ async def delete_marketplace_item(
         raise HTTPException(status_code=404, detail="Item not found")
     item.is_active = False
     db.commit()
+    log_audit(
+        db,
+        action="marketplace.deactivate",
+        resource_type="marketplace_item",
+        actor=current_admin,
+        resource_id=str(item.id),
+        details={"sku": item.sku},
+        request=request,
+    )
     return {"message": "Item deactivated"}
 
 

@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from services.database import get_db
 from services.auth_service import get_current_user, verify_password
 from services.account_deletion import permanently_delete_user
+from services.audit_service import log_audit
 from services.data_export import export_user_data
 from models.user import User
 from schemas.user import AccountDeleteRequest, User as UserSchema, UserUpdate
@@ -53,6 +54,7 @@ async def update_current_user(
 @router.delete("/me")
 async def delete_current_user(
     payload: AccountDeleteRequest,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -62,5 +64,16 @@ async def delete_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect password",
         )
+    user_id = current_user.id
+    email = current_user.email
+    log_audit(
+        db,
+        action="user.delete",
+        resource_type="user",
+        actor=current_user,
+        resource_id=str(user_id),
+        details={"email": email},
+        request=request,
+    )
     permanently_delete_user(db, current_user)
     return {"message": "Account permanently deleted"}

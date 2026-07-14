@@ -69,3 +69,10 @@ class OrderCreateResponse(BaseModel):
     status: str
     payment_status: str
     payment: PaymentInfo
+
+
+class OrderListResponse(BaseModel):
+    items: List[Order]
+    total: int
+    limit: int = Field(ge=1)
+    offset: int = Field(ge=0)

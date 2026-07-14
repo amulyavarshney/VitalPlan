@@ -26,7 +26,9 @@ def test_create_and_list_orders(client, auth_headers):
 
     listed = client.get("/api/orders/", headers=auth_headers)
     assert listed.status_code == 200
-    assert len(listed.json()) >= 1
+    body = listed.json()
+    assert body["total"] >= 1
+    assert len(body["items"]) >= 1
 
 
 def test_reject_invalid_order_payload(client, auth_headers):

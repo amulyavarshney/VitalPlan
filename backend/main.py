@@ -1,3 +1,4 @@
+from typing import Optional
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
@@ -12,15 +13,18 @@ import logging
 from routers import auth, users, goals, diet_plans, marketplace, scanner, orders, admin, webhooks
 from config import settings
 from services.database import engine, Base
-from services.storage_service import resolve_upload_path, s3_enabled
+from services.storage_service import resolve_upload_path, s3_enabled, verify_upload_signature
 from services.health_service import build_health_report
 from services.logging_config import configure_logging
+from services.metrics_service import PrometheusMiddleware, metrics_response
 import models.user  # noqa: F401
 import models.goal  # noqa: F401
 import models.diet_plan  # noqa: F401
 import models.order  # noqa: F401
 import models.scanned_food  # noqa: F401
 import models.marketplace_item  # noqa: F401
+import models.audit_log  # noqa: F401
+import models.revoked_token  # noqa: F401
 
 configure_logging(environment=settings.ENVIRONMENT, log_format=settings.LOG_FORMAT)
 logger = logging.getLogger(__name__)
@@ -45,7 +49,7 @@ if settings.ENVIRONMENT != "production":
 app = FastAPI(
     title="VitalPlan API",
     description="AI-Powered Diet Guide and Nutrition Tracker Backend",
-    version="1.5.0",
+    version="1.6.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
 )
@@ -89,6 +93,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         return response
 
 
+app.add_middleware(PrometheusMiddleware)
 app.add_middleware(RequestContextMiddleware)
 app.add_middleware(
     CORSMiddleware,
@@ -165,11 +170,29 @@ app.include_router(webhooks.router, prefix="/api/webhooks", tags=["Webhooks"])
 
 
 @app.get("/api/uploads/{subdir}/{filename}")
-async def serve_upload(subdir: str, filename: str):
-    path = resolve_upload_path(f"{subdir}/{filename}")
+async def serve_upload(
+    subdir: str,
+    filename: str,
+    exp: Optional[str] = None,
+    sig: Optional[str] = None,
+):
+    """Serve a local upload when a valid HMAC signature is present."""
+    relative_key = f"{subdir}/{filename}"
+    if not verify_upload_signature(relative_key, exp, sig):
+        return JSONResponse(
+            status_code=401,
+            content={"error": {"message": "Missing or invalid upload signature"}},
+        )
+    path = resolve_upload_path(relative_key)
     if not path:
         return JSONResponse(status_code=404, content={"error": {"message": "File not found"}})
     return FileResponse(path)
+
+
+@app.get("/metrics")
+async def prometheus_metrics():
+    """Prometheus scrape endpoint."""
+    return metrics_response()
 
 
 @app.get("/api/health")
@@ -182,7 +205,7 @@ async def health_check():
         content={
             **report,
             "environment": settings.ENVIRONMENT,
-            "version": "1.5.0",
+            "version": "1.6.0",
             "features": {
                 "refresh_tokens": True,
                 "barcode_lookup": True,
@@ -192,6 +215,9 @@ async def health_check():
                 "redis_rate_limits": True,
                 "s3_uploads": s3_enabled(),
                 "sentry": bool(settings.SENTRY_DSN),
+                "audit_log": True,
+                "token_revocation": True,
+                "metrics": True,
             },
         },
     )
@@ -202,7 +228,7 @@ async def root():
     """Root endpoint"""
     return {
         "message": "Welcome to VitalPlan API",
-        "version": "1.5.0",
+        "version": "1.6.0",
         "docs": "/api/docs",
     }
 

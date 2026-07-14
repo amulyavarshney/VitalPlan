@@ -53,6 +53,13 @@ class User(UserBase):
         from_attributes = True
 
 
+class UserListResponse(BaseModel):
+    items: List[User]
+    total: int
+    limit: int = Field(ge=1)
+    offset: int = Field(ge=0)
+
+
 class RegisterResponse(User):
     verification_required: bool = False
     verification_token: Optional[str] = None

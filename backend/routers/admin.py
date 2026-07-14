@@ -1,8 +1,8 @@
 from datetime import timedelta
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status, Header
+from fastapi import APIRouter, Depends, HTTPException, status, Header, Query, Request
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import Optional
 
 from services.database import get_db
 from services.auth_service import (
@@ -12,8 +12,10 @@ from services.auth_service import (
     create_token_pair,
     get_current_admin_user,
 )
+from services.audit_service import log_audit
 from config import settings
 from models.user import User
+from models.audit_log import AuditLog
 from schemas.user import (
     AdminCreate,
     User as UserSchema,
@@ -21,7 +23,9 @@ from schemas.user import (
     UserLogin,
     SpoofRequest,
     UserAdminUpdate,
+    UserListResponse,
 )
+from schemas.audit import AuditLogEntry, AuditLogListResponse
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -128,20 +132,25 @@ async def login_admin(admin_credentials: UserLogin, db: Session = Depends(get_db
     return create_token_pair(user.email, extra={"admin": True})
 
 
-@router.get("/users", response_model=List[UserSchema])
+@router.get("/users", response_model=UserListResponse)
 async def get_all_users(
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     current_admin: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db),
 ):
-    """Get all users (admin only)"""
-    users = db.query(User).order_by(User.id.asc()).all()
-    return users
+    """Get users (admin only), paginated."""
+    query = db.query(User).order_by(User.id.asc())
+    total = query.count()
+    users = query.offset(offset).limit(limit).all()
+    return UserListResponse(items=users, total=total, limit=limit, offset=offset)
 
 
 @router.patch("/users/{user_id}", response_model=UserSchema)
 async def update_user_admin_fields(
     user_id: int,
     payload: UserAdminUpdate,
+    request: Request,
     current_admin: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db),
 ):
@@ -171,6 +180,15 @@ async def update_user_admin_fields(
 
     db.commit()
     db.refresh(target)
+    log_audit(
+        db,
+        action="user.update",
+        resource_type="user",
+        actor=current_admin,
+        resource_id=str(target.id),
+        details={"fields": data, "target_email": target.email},
+        request=request,
+    )
     logger.info(
         "Admin %s updated user %s fields=%s",
         current_admin.email,
@@ -183,6 +201,7 @@ async def update_user_admin_fields(
 @router.post("/spoof", response_model=Token)
 async def spoof_user(
     spoof_request: SpoofRequest,
+    request: Request,
     current_admin: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db),
 ):
@@ -214,6 +233,15 @@ async def spoof_user(
     )
     refresh = create_token_pair(target_user.email)["refresh_token"]
 
+    log_audit(
+        db,
+        action="user.spoof",
+        resource_type="user",
+        actor=current_admin,
+        resource_id=str(target_user.id),
+        details={"target_email": target_user.email},
+        request=request,
+    )
     logger.warning(
         "Admin spoof: admin=%s target=%s",
         current_admin.email,
@@ -225,6 +253,28 @@ async def spoof_user(
         "refresh_token": refresh,
         "token_type": "bearer",
     }
+
+
+@router.get("/audit", response_model=AuditLogListResponse)
+async def list_audit_logs(
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    action: Optional[str] = Query(None),
+    current_admin: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    """List recent audit events (admin only)."""
+    query = db.query(AuditLog).order_by(AuditLog.created_at.desc())
+    if action:
+        query = query.filter(AuditLog.action == action)
+    total = query.count()
+    rows = query.offset(offset).limit(limit).all()
+    return AuditLogListResponse(
+        items=[AuditLogEntry.model_validate(row) for row in rows],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.get("/me", response_model=UserSchema)

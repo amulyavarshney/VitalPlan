@@ -11,6 +11,8 @@ import models.diet_plan  # noqa: F401
 import models.order  # noqa: F401
 import models.scanned_food  # noqa: F401
 import models.marketplace_item  # noqa: F401
+import models.audit_log  # noqa: F401
+import models.revoked_token  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)

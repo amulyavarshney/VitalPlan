@@ -1,6 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
-from typing import List
 
 from services.database import get_db
 from services.auth_service import get_current_user
@@ -22,6 +21,7 @@ from schemas.order import (
     OrderCreateResponse,
     OrderPayRequest,
     PaymentInfo,
+    OrderListResponse,
 )
 
 router = APIRouter()
@@ -142,19 +142,22 @@ async def pay_order(
     )
 
 
-@router.get("/", response_model=List[OrderSchema])
+@router.get("/", response_model=OrderListResponse)
 async def get_user_orders(
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Get user's order history"""
-    orders = (
+    """Get user's order history (paginated)."""
+    query = (
         db.query(Order)
         .filter(Order.user_id == current_user.id)
         .order_by(Order.created_at.desc())
-        .all()
     )
-    return orders
+    total = query.count()
+    orders = query.offset(offset).limit(limit).all()
+    return OrderListResponse(items=orders, total=total, limit=limit, offset=offset)
 
 
 @router.get("/{order_id}", response_model=OrderSchema)
