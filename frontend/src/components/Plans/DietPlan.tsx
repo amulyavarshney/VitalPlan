@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { Clock, ChefHat, ShoppingCart, Loader, RefreshCw, Download, X, Eye } from 'lucide-react';
-import jsPDF from 'jspdf';
 import type { DietPlan as DietPlanType, Meal, Supplement, Goal, User } from '../../types';
 import { dietPlansAPI, getApiErrorMessage } from '../../services/api';
 
@@ -328,6 +327,7 @@ export default function DietPlan({ goals, user, onAddToCart }: DietPlanProps) {
     setIsDownloading(true);
     
     try {
+      const { default: jsPDF } = await import('jspdf');
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();

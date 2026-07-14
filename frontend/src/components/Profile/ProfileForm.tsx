@@ -445,35 +445,65 @@ export default function ProfileForm({ user, onSave, onNext }: ProfileFormProps) 
         </form>
 
         {!onNext && (
-          <div className="mt-8 p-4 border border-red-100 rounded-xl bg-red-50/50">
-            <h3 className="text-sm font-semibold text-red-800 mb-1">Delete account</h3>
-            <p className="text-sm text-red-700 mb-3">
-              Deactivates your account. You will be signed out and unable to log in.
-            </p>
-            {deleteError && <p className="text-sm text-red-600 mb-2">{deleteError}</p>}
-            <button
-              type="button"
-              disabled={isDeleting}
-              onClick={async () => {
-                if (!window.confirm('Delete your VitalPlan account? This cannot be undone from the app.')) {
-                  return;
-                }
-                setIsDeleting(true);
-                setDeleteError(null);
-                try {
-                  await usersAPI.deleteAccount();
-                  logout();
-                  navigate('/');
-                } catch (err) {
-                  setDeleteError(getApiErrorMessage(err, 'Failed to delete account'));
-                } finally {
-                  setIsDeleting(false);
-                }
-              }}
-              className="px-4 py-2 text-sm font-medium text-red-700 border border-red-200 rounded-lg hover:bg-red-100 disabled:opacity-60"
-            >
-              {isDeleting ? 'Deleting...' : 'Delete my account'}
-            </button>
+          <div className="mt-8 space-y-4">
+            <div className="p-4 border border-gray-200 rounded-xl bg-gray-50">
+              <h3 className="text-sm font-semibold text-gray-900 mb-1">Download my data</h3>
+              <p className="text-sm text-gray-600 mb-3">
+                Export your profile, goals, diet plans, orders, and scan history as JSON.
+              </p>
+              <button
+                type="button"
+                onClick={async () => {
+                  setDeleteError(null);
+                  try {
+                    const data = await usersAPI.exportData();
+                    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const anchor = document.createElement('a');
+                    anchor.href = url;
+                    anchor.download = `vitalplan-export-${Date.now()}.json`;
+                    anchor.click();
+                    URL.revokeObjectURL(url);
+                  } catch (err) {
+                    setDeleteError(getApiErrorMessage(err, 'Failed to export data'));
+                  }
+                }}
+                className="px-4 py-2 text-sm font-medium text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-50"
+              >
+                Download JSON export
+              </button>
+            </div>
+
+            <div className="p-4 border border-red-100 rounded-xl bg-red-50/50">
+              <h3 className="text-sm font-semibold text-red-800 mb-1">Delete account</h3>
+              <p className="text-sm text-red-700 mb-3">
+                Deactivates your account. You will be signed out and unable to log in.
+              </p>
+              {deleteError && <p className="text-sm text-red-600 mb-2">{deleteError}</p>}
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={async () => {
+                  if (!window.confirm('Delete your VitalPlan account? This cannot be undone from the app.')) {
+                    return;
+                  }
+                  setIsDeleting(true);
+                  setDeleteError(null);
+                  try {
+                    await usersAPI.deleteAccount();
+                    logout();
+                    navigate('/');
+                  } catch (err) {
+                    setDeleteError(getApiErrorMessage(err, 'Failed to delete account'));
+                  } finally {
+                    setIsDeleting(false);
+                  }
+                }}
+                className="px-4 py-2 text-sm font-medium text-red-700 border border-red-200 rounded-lg hover:bg-red-100 disabled:opacity-60"
+              >
+                {isDeleting ? 'Deleting...' : 'Delete my account'}
+              </button>
+            </div>
           </div>
         )}
       </div>

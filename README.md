@@ -96,7 +96,7 @@ Frontend E2E smoke: `cd frontend && npm run test:e2e`.
 - `POST /api/auth/password-reset/request` · `POST /api/auth/password-reset/confirm`
 
 ### Users / admin
-- `GET|PUT|DELETE /api/users/me`
+- `GET|PUT|DELETE /api/users/me` · `GET /api/users/me/export`
 - `GET /api/admin/users` · `PATCH /api/admin/users/{id}`
 - Marketplace admin CRUD under `/api/marketplace/admin/items`
 

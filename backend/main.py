@@ -5,6 +5,7 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 import time
+import uuid
 import uvicorn
 import logging
 
@@ -46,31 +47,29 @@ if settings.ENVIRONMENT != "production":
 app = FastAPI(
     title="VitalPlan API",
     description="AI-Powered Diet Guide and Nutrition Tracker Backend",
-    version="1.2.0",
+    version="1.3.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
 )
 
 
-class RequestLoggingMiddleware(BaseHTTPMiddleware):
+class RequestContextMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
+        request_id = request.headers.get("x-request-id") or uuid.uuid4().hex
+        request.state.request_id = request_id
         started = time.perf_counter()
         response = await call_next(request)
         duration_ms = (time.perf_counter() - started) * 1000
         logger.info(
-            "%s %s -> %s (%.1fms)",
+            "request_id=%s %s %s -> %s (%.1fms)",
+            request_id,
             request.method,
             request.url.path,
             response.status_code,
             duration_ms,
         )
+        response.headers["X-Request-ID"] = request_id
         response.headers["X-Response-Time-ms"] = f"{duration_ms:.1f}"
-        return response
-
-
-class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
@@ -81,8 +80,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 
-app.add_middleware(SecurityHeadersMiddleware)
-app.add_middleware(RequestLoggingMiddleware)
+app.add_middleware(RequestContextMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_HOSTS,
@@ -167,7 +165,7 @@ async def health_check():
         content={
             **report,
             "environment": settings.ENVIRONMENT,
-            "version": "1.2.0",
+            "version": "1.3.0",
             "features": {
                 "refresh_tokens": True,
                 "barcode_lookup": True,
@@ -187,7 +185,7 @@ async def root():
     """Root endpoint"""
     return {
         "message": "Welcome to VitalPlan API",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "docs": "/api/docs",
     }
 

@@ -1,22 +1,29 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Navigate, Route, Routes, useNavigate, useSearchParams } from 'react-router-dom';
 import Header from './components/Layout/Header';
 import Hero from './components/Home/Hero';
 import ProfileForm from './components/Profile/ProfileForm';
 import GoalSelection from './components/Goals/GoalSelection';
-import DietPlan from './components/Plans/DietPlan';
-import OrderSystem from './components/Orders/OrderSystem';
-import Marketplace from './components/Marketplace/Marketplace';
-import FoodScanner from './components/Scanner/FoodScanner';
 import AuthForm from './components/Auth/AuthForm';
 import VerifyEmailPage from './components/Auth/VerifyEmailPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminRoute from './components/AdminRoute';
-import AdminDashboard from './components/Admin/AdminDashboard';
 import SpoofBanner from './components/SpoofBanner';
 import { useAuth, getApiErrorMessage } from './hooks/useAuth';
 import { goalsAPI, ordersAPI } from './services/api';
 import type { User, Goal, OrderItem, Order } from './types';
+
+const DietPlan = lazy(() => import('./components/Plans/DietPlan'));
+const OrderSystem = lazy(() => import('./components/Orders/OrderSystem'));
+const Marketplace = lazy(() => import('./components/Marketplace/Marketplace'));
+const FoodScanner = lazy(() => import('./components/Scanner/FoodScanner'));
+const AdminDashboard = lazy(() => import('./components/Admin/AdminDashboard'));
+
+function RouteFallback() {
+  return (
+    <div className="min-h-[40vh] flex items-center justify-center text-gray-600">Loading...</div>
+  );
+}
 
 function AuthPage({ mode }: { mode: 'login' | 'register' | 'reset' }) {
   const navigate = useNavigate();
@@ -222,73 +229,75 @@ function AppContent() {
         </div>
       )}
       <main>
-        <Routes>
-          <Route path="/" element={<Hero onGetStarted={handleGetStarted} />} />
-          <Route path="/login" element={<AuthPage mode="login" />} />
-          <Route path="/register" element={<AuthPage mode="register" />} />
-          <Route path="/reset-password" element={<AuthPage mode="reset" />} />
-          <Route path="/verify-email" element={<VerifyEmailPage />} />
-          <Route
-            path="/profile"
-            element={
-              <ProtectedRoute>
-                <ProfilePage
-                  goals={goals}
-                  setGoals={setGoals}
-                  onboardingStep={onboardingStep}
-                  setOnboardingStep={setOnboardingStep}
-                  showMessage={showMessage}
-                />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/plans"
-            element={
-              <ProtectedRoute>
-                <DietPlan goals={goals} user={appUser} onAddToCart={handleAddToCart} />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/marketplace"
-            element={
-              <ProtectedRoute>
-                <Marketplace onAddToCart={handleAddToCart} />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/scanner"
-            element={
-              <ProtectedRoute>
-                <FoodScanner onAddToCart={handleAddToCart} />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/orders"
-            element={
-              <ProtectedRoute>
-                <OrderSystem
-                  cartItems={cartItems}
-                  onUpdateCart={setCartItems}
-                  userId={appUser?.id || '0'}
-                  onOrderComplete={handleOrderComplete}
-                />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin"
-            element={
-              <AdminRoute>
-                <AdminDashboard />
-              </AdminRoute>
-            }
-          />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        <Suspense fallback={<RouteFallback />}>
+          <Routes>
+            <Route path="/" element={<Hero onGetStarted={handleGetStarted} />} />
+            <Route path="/login" element={<AuthPage mode="login" />} />
+            <Route path="/register" element={<AuthPage mode="register" />} />
+            <Route path="/reset-password" element={<AuthPage mode="reset" />} />
+            <Route path="/verify-email" element={<VerifyEmailPage />} />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute>
+                  <ProfilePage
+                    goals={goals}
+                    setGoals={setGoals}
+                    onboardingStep={onboardingStep}
+                    setOnboardingStep={setOnboardingStep}
+                    showMessage={showMessage}
+                  />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/plans"
+              element={
+                <ProtectedRoute>
+                  <DietPlan goals={goals} user={appUser} onAddToCart={handleAddToCart} />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/marketplace"
+              element={
+                <ProtectedRoute>
+                  <Marketplace onAddToCart={handleAddToCart} />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/scanner"
+              element={
+                <ProtectedRoute>
+                  <FoodScanner onAddToCart={handleAddToCart} />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/orders"
+              element={
+                <ProtectedRoute>
+                  <OrderSystem
+                    cartItems={cartItems}
+                    onUpdateCart={setCartItems}
+                    userId={appUser?.id || '0'}
+                    onOrderComplete={handleOrderComplete}
+                  />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <AdminRoute>
+                  <AdminDashboard />
+                </AdminRoute>
+              }
+            />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
       </main>
     </div>
   );

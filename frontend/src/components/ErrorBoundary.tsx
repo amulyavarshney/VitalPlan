@@ -19,10 +19,8 @@ export default class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error('UI error boundary caught:', error, info);
-    void import('../sentry').then(({ Sentry }) => {
-      if (import.meta.env.VITE_SENTRY_DSN) {
-        Sentry.captureException(error, { extra: { componentStack: info.componentStack } });
-      }
+    void import('../sentry').then(({ captureException }) => {
+      void captureException(error, { componentStack: info.componentStack });
     });
   }
 

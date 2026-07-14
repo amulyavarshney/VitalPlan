@@ -58,6 +58,10 @@ class RateLimiter:
         self.name = name
         self._hits: Dict[str, Deque[float]] = defaultdict(deque)
 
+    def reset(self) -> None:
+        """Clear in-memory buckets (tests only)."""
+        self._hits.clear()
+
     def check(self, key: str) -> None:
         redis_client = get_redis_client()
         if redis_client is not None:

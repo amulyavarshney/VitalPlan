@@ -6,7 +6,18 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from services.database import Base, get_db
+from services.rate_limit import auth_rate_limiter, password_reset_limiter
 from main import app
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limiters():
+    """Avoid cross-test 429s from the shared in-memory auth limiter."""
+    auth_rate_limiter.reset()
+    password_reset_limiter.reset()
+    yield
+    auth_rate_limiter.reset()
+    password_reset_limiter.reset()
 
 
 @pytest.fixture()

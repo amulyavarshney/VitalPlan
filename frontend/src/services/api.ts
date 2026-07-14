@@ -190,6 +190,10 @@ export const usersAPI = {
     const response = await api.put('/users/me', keysToSnake(userData));
     return keysToCamel<AuthUser>(response.data);
   },
+  exportData: async () => {
+    const response = await api.get('/users/me/export');
+    return response.data as Record<string, unknown>;
+  },
   deleteAccount: () => api.delete('/users/me'),
 };
 

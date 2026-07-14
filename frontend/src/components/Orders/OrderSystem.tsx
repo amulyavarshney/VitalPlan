@@ -1,6 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Elements } from '@stripe/react-stripe-js';
-import { loadStripe, type Stripe } from '@stripe/stripe-js';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import {
   ShoppingCart,
   Trash2,
@@ -14,7 +12,8 @@ import {
 } from 'lucide-react';
 import type { Order, OrderItem } from '../../types';
 import { ordersAPI, getApiErrorMessage } from '../../services/api';
-import StripeCheckoutForm from './StripeCheckoutForm';
+
+const StripePaymentPanel = lazy(() => import('./StripePaymentPanel'));
 
 interface OrderSystemProps {
   cartItems: OrderItem[];
@@ -29,15 +28,6 @@ interface PendingPayment {
   publishableKey: string;
   paymentIntentId: string;
   orderDraft: Omit<Order, 'id' | 'createdAt'>;
-}
-
-let stripePromiseCache: Promise<Stripe | null> | null = null;
-
-function getStripe(publishableKey: string) {
-  if (!stripePromiseCache) {
-    stripePromiseCache = loadStripe(publishableKey);
-  }
-  return stripePromiseCache;
 }
 
 function formatDate(value: Date | string | undefined) {
@@ -196,14 +186,6 @@ export default function OrderSystem({ cartItems, onUpdateCart, userId, onOrderCo
       setIsPlacing(false);
     }
   };
-
-  const stripeOptions = useMemo(() => {
-    if (!pendingPayment) return undefined;
-    return {
-      clientSecret: pendingPayment.clientSecret,
-      appearance: { theme: 'stripe' as const },
-    };
-  }, [pendingPayment]);
 
   return (
     <div className="max-w-4xl mx-auto p-6">
@@ -448,9 +430,10 @@ export default function OrderSystem({ cartItems, onUpdateCart, userId, onOrderCo
                 <span className="text-emerald-600">${grandTotal.toFixed(2)}</span>
               </div>
 
-              {pendingPayment && stripeOptions ? (
-                <Elements stripe={getStripe(pendingPayment.publishableKey)} options={stripeOptions}>
-                  <StripeCheckoutForm
+              {pendingPayment ? (
+                <Suspense fallback={<p className="text-sm text-gray-500 text-center py-4">Loading secure payment...</p>}>
+                  <StripePaymentPanel
+                    pendingPayment={pendingPayment}
                     onCancel={() => setPendingPayment(null)}
                     onSuccess={async () => {
                       try {
@@ -464,7 +447,7 @@ export default function OrderSystem({ cartItems, onUpdateCart, userId, onOrderCo
                       }
                     }}
                   />
-                </Elements>
+                </Suspense>
               ) : (
                 <>
                   <button

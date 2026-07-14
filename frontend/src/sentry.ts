@@ -1,9 +1,8 @@
-import * as Sentry from '@sentry/react';
-
-const dsn = import.meta.env.VITE_SENTRY_DSN as string | undefined;
-
-export function initSentry() {
+export async function initSentry() {
+  const dsn = import.meta.env.VITE_SENTRY_DSN as string | undefined;
   if (!dsn) return;
+
+  const Sentry = await import('@sentry/react');
   Sentry.init({
     dsn,
     environment: import.meta.env.MODE,
@@ -11,4 +10,8 @@ export function initSentry() {
   });
 }
 
-export { Sentry };
+export async function captureException(error: unknown, extra?: Record<string, unknown>) {
+  if (!import.meta.env.VITE_SENTRY_DSN) return;
+  const Sentry = await import('@sentry/react');
+  Sentry.captureException(error, { extra });
+}
