@@ -1,12 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from typing import List
 
 from services.database import get_db
 from services.auth_service import get_current_user
-from services.payment_service import create_payment_intent, confirm_payment, payment_public_config
+from services.payment_service import (
+    cancel_payment_intent,
+    create_payment_intent,
+    confirm_payment,
+    payment_public_config,
+)
 from services.order_payment import apply_payment_result
 from services.order_pricing import compute_order_totals, totals_match
+from services.rate_limit import client_key, order_rate_limiter
 from models.user import User
 from models.order import Order
 from schemas.order import (
@@ -20,6 +26,9 @@ from schemas.order import (
 
 router = APIRouter()
 
+CANCELLABLE_PAYMENT_STATUSES = {"unpaid", "requires_action", "failed"}
+NON_CANCELLABLE_ORDER_STATUSES = {"delivered", "shipped"}
+
 
 @router.get("/payments/config")
 async def get_payment_config(current_user: User = Depends(get_current_user)):
@@ -30,10 +39,12 @@ async def get_payment_config(current_user: User = Depends(get_current_user)):
 @router.post("/", response_model=OrderCreateResponse)
 async def create_order(
     order_data: OrderCreate,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Create a new order and initialize payment."""
+    order_rate_limiter.check(client_key(request, f"create:{current_user.id}"))
     pricing = compute_order_totals(items=order_data.items, vendor=order_data.vendor)
     if not totals_match(order_data.total, pricing["total"]):
         raise HTTPException(
@@ -162,6 +173,50 @@ async def get_order(
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
+    return order
+
+
+@router.post("/{order_id}/cancel", response_model=OrderSchema)
+async def cancel_order(
+    order_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Cancel an unpaid/open order owned by the current user."""
+    order = (
+        db.query(Order)
+        .filter(Order.id == order_id, Order.user_id == current_user.id)
+        .first()
+    )
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    if order.status == "cancelled":
+        return order
+
+    if order.payment_status == "paid":
+        raise HTTPException(status_code=400, detail="Paid orders cannot be cancelled")
+
+    if order.status in NON_CANCELLABLE_ORDER_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Orders with status '{order.status}' cannot be cancelled",
+        )
+
+    payment_status = (order.payment_status or "unpaid").lower()
+    if payment_status not in CANCELLABLE_PAYMENT_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Orders with payment status '{payment_status}' cannot be cancelled",
+        )
+
+    if order.payment_intent_id:
+        await cancel_payment_intent(order.payment_intent_id)
+
+    order.status = "cancelled"
+    order.payment_status = "cancelled"
+    db.commit()
+    db.refresh(order)
     return order
 
 

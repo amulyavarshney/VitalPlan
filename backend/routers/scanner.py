@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import List
 from datetime import datetime, timezone
@@ -9,6 +9,7 @@ from services.auth_service import get_current_user
 from services.ai_service import ai_service
 from services.barcode_service import lookup_barcode
 from services.storage_service import save_upload, public_upload_url
+from services.rate_limit import ai_rate_limiter, client_key
 from models.user import User
 from models.scanned_food import ScannedFood
 from schemas.scanner import FoodAnalysisResult, ScannedFood as ScannedFoodSchema
@@ -20,11 +21,13 @@ logger = logging.getLogger(__name__)
 
 @router.post("/analyze-image", response_model=FoodAnalysisResult)
 async def analyze_food_image(
+    request: Request,
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Analyze food image using AI and persist the upload."""
+    ai_rate_limiter.check(client_key(request, f"scan:{current_user.id}"))
     try:
         if file.content_type not in settings.ALLOWED_IMAGE_TYPES:
             raise HTTPException(

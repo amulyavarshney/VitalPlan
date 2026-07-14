@@ -175,6 +175,27 @@ async def confirm_payment(payment_intent_id: str) -> Dict[str, Any]:
         }
 
 
+async def cancel_payment_intent(payment_intent_id: str) -> None:
+    """Best-effort cancel of an open payment intent (no-op for demo intents)."""
+    if not payment_intent_id or payment_intent_id.startswith("demo_pi_"):
+        return
+    if not payments_enabled():
+        return
+
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        response = await client.post(
+            f"https://api.stripe.com/v1/payment_intents/{payment_intent_id}/cancel",
+            auth=(settings.STRIPE_SECRET_KEY, ""),
+        )
+        # Already canceled / succeeded intents are fine to ignore for local order cancel.
+        if response.status_code >= 400:
+            logger.warning(
+                "Stripe PaymentIntent cancel skipped for %s: %s",
+                payment_intent_id,
+                response.text,
+            )
+
+
 def payment_public_config() -> Dict[str, Any]:
     return {
         "provider": "stripe" if payments_enabled() else "demo",

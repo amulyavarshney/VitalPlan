@@ -98,7 +98,7 @@ export interface Order {
   vendor: 'amazon' | 'walmart' | 'local' | string;
   deliveryAddress?: string;
   paymentMethod?: string;
-  paymentStatus?: 'unpaid' | 'requires_action' | 'paid' | 'failed' | string;
+  paymentStatus?: 'unpaid' | 'requires_action' | 'paid' | 'failed' | 'cancelled' | string;
   paymentIntentId?: string;
   paymentProvider?: string;
   paidAt?: Date | string;

@@ -46,6 +46,8 @@ class Settings(BaseSettings):
     # Observability (optional)
     SENTRY_DSN: str = ""
     SENTRY_TRACES_SAMPLE_RATE: float = 0.1
+    # Logging: auto (JSON in production) | text | json
+    LOG_FORMAT: str = "auto"
 
     # Open Food Facts
     OPEN_FOOD_FACTS_USER_AGENT: str = "VitalPlan/1.0 (contact: support@vitalplan.local)"

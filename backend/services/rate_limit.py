@@ -102,6 +102,9 @@ class RateLimiter:
 
 auth_rate_limiter = RateLimiter(max_requests=20, window_seconds=60, name="auth")
 password_reset_limiter = RateLimiter(max_requests=5, window_seconds=300, name="password_reset")
+# Expensive / AI-backed endpoints
+ai_rate_limiter = RateLimiter(max_requests=10, window_seconds=60, name="ai")
+order_rate_limiter = RateLimiter(max_requests=30, window_seconds=60, name="orders")
 
 
 def client_key(request: Request, suffix: str = "") -> str:

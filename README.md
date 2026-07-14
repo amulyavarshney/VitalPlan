@@ -89,6 +89,8 @@ Frontend E2E smoke: `cd frontend && npm run test:e2e`.
 - Order totals are computed server-side (subtotal + vendor delivery fee + 8% tax)
 - `DELETE /api/users/me` permanently erases account data after password confirmation
 - API responses set a tight CSP; the frontend nginx image adds SPA-oriented CSP + framing headers
+- Unpaid orders can be cancelled (`POST /api/orders/{id}/cancel`); AI/scanner/order create endpoints are rate-limited
+- Production logging defaults to JSON (`LOG_FORMAT=auto`)
 
 ## Key API endpoints
 
@@ -105,7 +107,7 @@ Frontend E2E smoke: `cd frontend && npm run test:e2e`.
 ### Plans / scanner / orders
 - `POST /api/diet-plans/generate` · `GET /api/diet-plans`
 - `POST /api/scanner/analyze-image` · `GET /api/scanner/history` · `POST /api/scanner/barcode/{barcode}`
-- `POST /api/orders` · `POST /api/orders/{id}/pay` · `GET /api/orders`
+- `POST /api/orders` · `POST /api/orders/{id}/pay` · `POST /api/orders/{id}/cancel` · `GET /api/orders`
 - `POST /api/webhooks/stripe` (Stripe signature; see webhook docs)
 - `GET /api/health` (DB + Redis probes)
 

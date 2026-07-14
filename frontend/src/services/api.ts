@@ -408,6 +408,10 @@ export const ordersAPI = {
     const response = await api.get(`/orders/${orderId}`);
     return keysToCamel<Order>(response.data);
   },
+  cancelOrder: async (orderId: number) => {
+    const response = await api.post(`/orders/${orderId}/cancel`);
+    return keysToCamel<Order>(response.data);
+  },
   updateOrderStatus: async (orderId: number, status: string) => {
     const response = await api.put(`/orders/${orderId}/status`, { status });
     return response.data;

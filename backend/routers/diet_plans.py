@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from typing import List
 
 from services.database import get_db
 from services.auth_service import get_current_user
 from services.ai_service import ai_service
+from services.rate_limit import ai_rate_limiter, client_key
 from models.user import User
 from models.goal import Goal
 from models.diet_plan import DietPlan
@@ -27,10 +28,12 @@ async def get_user_diet_plans(
 @router.post("/generate", response_model=DietPlanSchema)
 async def generate_diet_plan(
     plan_request: DietPlanGenerate,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Generate a new AI-powered diet plan"""
+    ai_rate_limiter.check(client_key(request, f"diet:{current_user.id}"))
     try:
         # Prepare user data
         user_data = {

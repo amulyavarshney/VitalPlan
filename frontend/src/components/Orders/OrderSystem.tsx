@@ -37,6 +37,14 @@ function formatDate(value: Date | string | undefined) {
   return date.toLocaleString();
 }
 
+function canCancelOrder(order: Order) {
+  if (order.status === 'cancelled' || order.status === 'delivered' || order.status === 'shipped') {
+    return false;
+  }
+  const payment = order.paymentStatus || 'unpaid';
+  return payment === 'unpaid' || payment === 'requires_action' || payment === 'failed';
+}
+
 function statusBadgeClass(status?: string) {
   switch (status) {
     case 'paid':
@@ -64,6 +72,7 @@ export default function OrderSystem({ cartItems, onUpdateCart, userId, onOrderCo
   const [orders, setOrders] = useState<Order[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<number | null>(null);
 
   const loadHistory = useCallback(async () => {
     setHistoryLoading(true);
@@ -77,6 +86,22 @@ export default function OrderSystem({ cartItems, onUpdateCart, userId, onOrderCo
       setHistoryLoading(false);
     }
   }, []);
+
+  const handleCancelOrder = async (orderId: number) => {
+    if (!window.confirm(`Cancel order #${orderId}?`)) {
+      return;
+    }
+    setCancellingId(orderId);
+    setHistoryError(null);
+    try {
+      const cancelled = await ordersAPI.cancelOrder(orderId);
+      setOrders((prev) => prev.map((order) => (Number(order.id) === orderId ? cancelled : order)));
+    } catch (err) {
+      setHistoryError(getApiErrorMessage(err, 'Failed to cancel order'));
+    } finally {
+      setCancellingId(null);
+    }
+  };
 
   useEffect(() => {
     ordersAPI
@@ -283,6 +308,18 @@ export default function OrderSystem({ cartItems, onUpdateCart, userId, onOrderCo
                     </li>
                   ))}
                 </ul>
+                {canCancelOrder(order) && (
+                  <div className="mt-3 pt-3 border-t border-gray-100">
+                    <button
+                      type="button"
+                      disabled={cancellingId === Number(order.id)}
+                      onClick={() => handleCancelOrder(Number(order.id))}
+                      className="text-sm font-medium text-red-600 hover:text-red-700 disabled:opacity-60"
+                    >
+                      {cancellingId === Number(order.id) ? 'Cancelling...' : 'Cancel order'}
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>

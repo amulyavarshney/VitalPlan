@@ -14,6 +14,7 @@ from config import settings
 from services.database import engine, Base
 from services.storage_service import resolve_upload_path, s3_enabled
 from services.health_service import build_health_report
+from services.logging_config import configure_logging
 import models.user  # noqa: F401
 import models.goal  # noqa: F401
 import models.diet_plan  # noqa: F401
@@ -21,10 +22,7 @@ import models.order  # noqa: F401
 import models.scanned_food  # noqa: F401
 import models.marketplace_item  # noqa: F401
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
-)
+configure_logging(environment=settings.ENVIRONMENT, log_format=settings.LOG_FORMAT)
 logger = logging.getLogger(__name__)
 
 if settings.SENTRY_DSN:
@@ -47,7 +45,7 @@ if settings.ENVIRONMENT != "production":
 app = FastAPI(
     title="VitalPlan API",
     description="AI-Powered Diet Guide and Nutrition Tracker Backend",
-    version="1.4.0",
+    version="1.5.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
 )
@@ -67,6 +65,13 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
             request.url.path,
             response.status_code,
             duration_ms,
+            extra={
+                "request_id": request_id,
+                "method": request.method,
+                "path": request.url.path,
+                "status_code": response.status_code,
+                "duration_ms": round(duration_ms, 1),
+            },
         )
         response.headers["X-Request-ID"] = request_id
         response.headers["X-Response-Time-ms"] = f"{duration_ms:.1f}"
@@ -89,8 +94,16 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_HOSTS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "Accept",
+        "X-Request-ID",
+        "X-Admin-Secret",
+        "Stripe-Signature",
+    ],
+    expose_headers=["X-Request-ID", "X-Response-Time-ms"],
 )
 
 
@@ -169,7 +182,7 @@ async def health_check():
         content={
             **report,
             "environment": settings.ENVIRONMENT,
-            "version": "1.4.0",
+            "version": "1.5.0",
             "features": {
                 "refresh_tokens": True,
                 "barcode_lookup": True,
@@ -189,7 +202,7 @@ async def root():
     """Root endpoint"""
     return {
         "message": "Welcome to VitalPlan API",
-        "version": "1.4.0",
+        "version": "1.5.0",
         "docs": "/api/docs",
     }
 
