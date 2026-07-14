@@ -1,0 +1,27 @@
+# Optional TLS termination with Caddy (Let's Encrypt).
+# Usage:
+#   export PUBLIC_HOST=app.example.com
+#   docker compose -f docker-compose.prod.yml -f docker-compose.tls.yml up -d --build
+#
+# Requires DNS for PUBLIC_HOST pointing at this host, and ports 80/443 open.
+
+services:
+  proxy:
+    image: caddy:2.8-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      PUBLIC_HOST: ${PUBLIC_HOST:?Set PUBLIC_HOST e.g. app.example.com}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+      - frontend
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:

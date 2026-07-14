@@ -1,0 +1,11 @@
+{$PUBLIC_HOST:localhost} {
+	encode gzip
+
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+
+	handle {
+		reverse_proxy frontend:80
+	}
+}

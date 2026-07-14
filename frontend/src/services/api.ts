@@ -299,6 +299,14 @@ export const adminAPI = {
     const response = await api.get('/admin/users');
     return keysToCamel<AuthUser[]>(response.data);
   },
+  spoofUser: async (userEmail: string) => {
+    const response = await api.post('/admin/spoof', { user_email: userEmail });
+    return response.data as {
+      access_token: string;
+      refresh_token?: string;
+      token_type: string;
+    };
+  },
   updateUser: async (userId: number, data: { isActive?: boolean; isVerified?: boolean }) => {
     const response = await api.patch(`/admin/users/${userId}`, keysToSnake(data));
     return keysToCamel<AuthUser>(response.data);

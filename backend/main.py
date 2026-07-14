@@ -11,7 +11,7 @@ import logging
 from routers import auth, users, goals, diet_plans, marketplace, scanner, orders, admin, webhooks
 from config import settings
 from services.database import engine, Base
-from services.storage_service import resolve_upload_path
+from services.storage_service import resolve_upload_path, s3_enabled
 from services.health_service import build_health_report
 import models.user  # noqa: F401
 import models.goal  # noqa: F401
@@ -25,6 +25,19 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+if settings.SENTRY_DSN:
+    import sentry_sdk
+    from sentry_sdk.integrations.fastapi import FastApiIntegration
+    from sentry_sdk.integrations.starlette import StarletteIntegration
+
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        environment=settings.ENVIRONMENT,
+        traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
+        integrations=[StarletteIntegration(), FastApiIntegration()],
+    )
+    logger.info("Sentry initialized")
 
 # Dev/test convenience only — production relies on Alembic via entrypoint.sh
 if settings.ENVIRONMENT != "production":
@@ -162,6 +175,8 @@ async def health_check():
                 "image_uploads": True,
                 "stripe_webhooks": True,
                 "redis_rate_limits": True,
+                "s3_uploads": s3_enabled(),
+                "sentry": bool(settings.SENTRY_DSN),
             },
         },
     )

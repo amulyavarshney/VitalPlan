@@ -70,7 +70,16 @@ export STRIPE_SECRET_KEY=... STRIPE_PUBLISHABLE_KEY=... STRIPE_WEBHOOK_SECRET=..
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 
-This runs nginx (`:80`) → frontend + API, Postgres, Redis. Put TLS in front (Cloudflare, Caddy, load balancer). See [docs/STRIPE_WEBHOOKS.md](docs/STRIPE_WEBHOOKS.md).
+HTTP on `:80` via nginx. For automatic HTTPS with Caddy/Let's Encrypt:
+
+```bash
+export PUBLIC_HOST=app.example.com
+docker compose -f docker-compose.prod.yml -f docker-compose.tls.yml up -d --build
+```
+
+Optional: `SENTRY_DSN` / `VITE_SENTRY_DSN`, S3 upload vars (`S3_BUCKET`, …). Stripe webhooks: [docs/STRIPE_WEBHOOKS.md](docs/STRIPE_WEBHOOKS.md).
+
+Frontend E2E smoke: `cd frontend && npm run test:e2e`.
 
 ## Security notes
 

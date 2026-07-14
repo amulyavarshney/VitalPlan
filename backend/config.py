@@ -34,8 +34,18 @@ class Settings(BaseSettings):
     # CORS
     ALLOWED_HOSTS: List[str] = ["http://localhost:3000", "http://localhost:5173"]
 
-    # Uploads
+    # Uploads (local disk; optional S3 when S3_BUCKET + keys set)
     UPLOAD_DIR: str = "./uploads"
+    S3_BUCKET: str = ""
+    S3_ENDPOINT_URL: str = ""  # e.g. https://s3.amazonaws.com or MinIO URL
+    S3_ACCESS_KEY_ID: str = ""
+    S3_SECRET_ACCESS_KEY: str = ""
+    S3_REGION: str = "us-east-1"
+    S3_PUBLIC_BASE_URL: str = ""  # optional CDN/public base; else presigned GET
+
+    # Observability (optional)
+    SENTRY_DSN: str = ""
+    SENTRY_TRACES_SAMPLE_RATE: float = 0.1
 
     # Open Food Facts
     OPEN_FOOD_FACTS_USER_AGENT: str = "VitalPlan/1.0 (contact: support@vitalplan.local)"

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Package, Users, Plus, RefreshCw, Shield } from 'lucide-react';
 import {
   adminAPI,
@@ -7,6 +7,7 @@ import {
   type AdminMarketplaceItem,
   type AuthUser,
 } from '../../services/api';
+import { useAuth } from '../../hooks/useAuth';
 
 type Tab = 'products' | 'users';
 
@@ -22,6 +23,8 @@ const emptyProductForm = {
 };
 
 export default function AdminDashboard() {
+  const { spoofUser } = useAuth();
+  const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>('products');
   const [products, setProducts] = useState<AdminMarketplaceItem[]>([]);
   const [users, setUsers] = useState<AuthUser[]>([]);
@@ -135,6 +138,16 @@ export default function AdminDashboard() {
       await loadUsers();
     } catch (err) {
       setError(getApiErrorMessage(err, 'Failed to verify user'));
+    }
+  };
+
+  const impersonateUser = async (user: AuthUser) => {
+    setError(null);
+    try {
+      await spoofUser(user.email);
+      navigate('/profile');
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Failed to impersonate user'));
     }
   };
 
@@ -389,6 +402,15 @@ export default function AdminDashboard() {
                         className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
                       >
                         Mark verified
+                      </button>
+                    )}
+                    {!user.isAdmin && user.isActive && (
+                      <button
+                        type="button"
+                        onClick={() => impersonateUser(user)}
+                        className="px-3 py-1.5 text-sm border border-amber-300 text-amber-800 rounded-lg hover:bg-amber-50"
+                      >
+                        Impersonate
                       </button>
                     )}
                     {!user.isAdmin && (

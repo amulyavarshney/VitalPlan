@@ -13,6 +13,7 @@ import VerifyEmailPage from './components/Auth/VerifyEmailPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminRoute from './components/AdminRoute';
 import AdminDashboard from './components/Admin/AdminDashboard';
+import SpoofBanner from './components/SpoofBanner';
 import { useAuth, getApiErrorMessage } from './hooks/useAuth';
 import { goalsAPI, ordersAPI } from './services/api';
 import type { User, Goal, OrderItem, Order } from './types';
@@ -211,6 +212,7 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <SpoofBanner />
       <Header cartItemsCount={getCartItemsCount()} />
       {statusMessage && (
         <div className="fixed top-16 inset-x-0 z-40 flex justify-center px-4 pointer-events-none">

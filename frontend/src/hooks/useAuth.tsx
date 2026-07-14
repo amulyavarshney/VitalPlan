@@ -2,6 +2,7 @@ import React, { useState, useEffect, createContext, useContext, useCallback } fr
 import {
   authAPI,
   usersAPI,
+  adminAPI,
   getApiErrorMessage,
   type AuthUser,
   type RegisterPayload,
@@ -13,10 +14,14 @@ interface AuthContextType {
   user: AuthUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  isSpoofing: boolean;
+  spoofAdminEmail: string | null;
   login: (email: string, password: string) => Promise<void>;
   register: (userData: RegisterPayload) => Promise<RegisterResult>;
   logout: () => void;
   updateProfile: (userData: Partial<RegisterPayload>) => Promise<void>;
+  spoofUser: (email: string) => Promise<void>;
+  exitSpoof: () => Promise<void>;
   toAppUser: () => User | null;
 }
 
@@ -53,6 +58,9 @@ function mapToAppUser(user: AuthUser): User {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [spoofAdminEmail, setSpoofAdminEmail] = useState<string | null>(
+    () => localStorage.getItem('spoof_admin_email')
+  );
 
   const loadUser = useCallback(async () => {
     try {
@@ -104,6 +112,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = () => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
+    localStorage.removeItem('admin_access_token');
+    localStorage.removeItem('admin_refresh_token');
+    localStorage.removeItem('spoof_admin_email');
+    setSpoofAdminEmail(null);
     setUser(null);
   };
 
@@ -112,14 +124,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(updated);
   };
 
+  const spoofUser = async (email: string) => {
+    if (!user?.isAdmin) {
+      throw new Error('Admin access required');
+    }
+    const tokens = await adminAPI.spoofUser(email);
+    localStorage.setItem('admin_access_token', localStorage.getItem('access_token') || '');
+    localStorage.setItem('admin_refresh_token', localStorage.getItem('refresh_token') || '');
+    localStorage.setItem('spoof_admin_email', user.email);
+    localStorage.setItem('access_token', tokens.access_token);
+    if (tokens.refresh_token) {
+      localStorage.setItem('refresh_token', tokens.refresh_token);
+    }
+    setSpoofAdminEmail(user.email);
+    setIsLoading(true);
+    await loadUser();
+  };
+
+  const exitSpoof = async () => {
+    const adminAccess = localStorage.getItem('admin_access_token');
+    const adminRefresh = localStorage.getItem('admin_refresh_token');
+    if (!adminAccess) {
+      logout();
+      return;
+    }
+    localStorage.setItem('access_token', adminAccess);
+    if (adminRefresh) {
+      localStorage.setItem('refresh_token', adminRefresh);
+    } else {
+      localStorage.removeItem('refresh_token');
+    }
+    localStorage.removeItem('admin_access_token');
+    localStorage.removeItem('admin_refresh_token');
+    localStorage.removeItem('spoof_admin_email');
+    setSpoofAdminEmail(null);
+    setIsLoading(true);
+    await loadUser();
+  };
+
   const value: AuthContextType = {
     user,
     isAuthenticated: !!user,
     isLoading,
+    isSpoofing: !!spoofAdminEmail,
+    spoofAdminEmail,
     login,
     register,
     logout,
     updateProfile,
+    spoofUser,
+    exitSpoof,
     toAppUser: () => (user ? mapToAppUser(user) : null),
   };
 
