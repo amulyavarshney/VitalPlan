@@ -79,10 +79,29 @@ export function getApiErrorMessage(error: unknown, fallback = 'Something went wr
 export interface AuthUser extends Omit<User, 'id' | 'goals' | 'createdAt'> {
   id: number;
   isActive: boolean;
+  isVerified?: boolean;
   isAdmin: boolean;
   createdAt: string;
   updatedAt?: string | null;
   goals?: Goal[];
+}
+
+export interface AdminMarketplaceItem {
+  id: number;
+  sku: string;
+  name: string;
+  description: string;
+  price: number;
+  originalPrice?: number | null;
+  category: string;
+  brand: string;
+  rating: number;
+  reviews: number;
+  imageUrl?: string | null;
+  inStock: boolean;
+  features: string[];
+  isActive: boolean;
+  createdAt?: string;
 }
 
 export interface RegisterPayload {
@@ -272,6 +291,62 @@ export const marketplaceAPI = {
   getRecommendations: async (limit?: number) => {
     const response = await api.get('/marketplace/recommendations', { params: { limit } });
     return keysToCamel<{ recommendations: MarketplaceItem[]; reason: string }>(response.data);
+  },
+};
+
+export const adminAPI = {
+  getUsers: async () => {
+    const response = await api.get('/admin/users');
+    return keysToCamel<AuthUser[]>(response.data);
+  },
+  updateUser: async (userId: number, data: { isActive?: boolean; isVerified?: boolean }) => {
+    const response = await api.patch(`/admin/users/${userId}`, keysToSnake(data));
+    return keysToCamel<AuthUser>(response.data);
+  },
+  listMarketplaceItems: async () => {
+    const response = await api.get('/marketplace/admin/items');
+    return keysToCamel<AdminMarketplaceItem[]>(response.data);
+  },
+  createMarketplaceItem: async (data: {
+    sku: string;
+    name: string;
+    description: string;
+    price: number;
+    originalPrice?: number;
+    category: string;
+    brand: string;
+    rating?: number;
+    reviews?: number;
+    imageUrl?: string;
+    inStock?: boolean;
+    features?: string[];
+  }) => {
+    const response = await api.post('/marketplace/admin/items', keysToSnake(data));
+    return keysToCamel<AdminMarketplaceItem>(response.data);
+  },
+  updateMarketplaceItem: async (
+    itemId: number,
+    data: Partial<{
+      name: string;
+      description: string;
+      price: number;
+      originalPrice: number;
+      category: string;
+      brand: string;
+      rating: number;
+      reviews: number;
+      imageUrl: string;
+      inStock: boolean;
+      features: string[];
+      isActive: boolean;
+    }>
+  ) => {
+    const response = await api.put(`/marketplace/admin/items/${itemId}`, keysToSnake(data));
+    return keysToCamel<AdminMarketplaceItem>(response.data);
+  },
+  deactivateMarketplaceItem: async (itemId: number) => {
+    const response = await api.delete(`/marketplace/admin/items/${itemId}`);
+    return response.data as { message: string };
   },
 };
 

@@ -14,7 +14,14 @@ from services.auth_service import (
 )
 from config import settings
 from models.user import User
-from schemas.user import AdminCreate, User as UserSchema, Token, UserLogin, SpoofRequest
+from schemas.user import (
+    AdminCreate,
+    User as UserSchema,
+    Token,
+    UserLogin,
+    SpoofRequest,
+    UserAdminUpdate,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -127,8 +134,50 @@ async def get_all_users(
     db: Session = Depends(get_db),
 ):
     """Get all users (admin only)"""
-    users = db.query(User).all()
+    users = db.query(User).order_by(User.id.asc()).all()
     return users
+
+
+@router.patch("/users/{user_id}", response_model=UserSchema)
+async def update_user_admin_fields(
+    user_id: int,
+    payload: UserAdminUpdate,
+    current_admin: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    """Activate/deactivate or mark users verified (admin only)."""
+    target = db.query(User).filter(User.id == user_id).first()
+    if not target:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    if target.id == current_admin.id and payload.is_active is False:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You cannot deactivate your own admin account",
+        )
+
+    if target.is_admin and payload.is_active is False:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot deactivate another admin user",
+        )
+
+    data = payload.model_dump(exclude_unset=True)
+    if not data:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No fields to update")
+
+    for field, value in data.items():
+        setattr(target, field, value)
+
+    db.commit()
+    db.refresh(target)
+    logger.info(
+        "Admin %s updated user %s fields=%s",
+        current_admin.email,
+        target.email,
+        list(data.keys()),
+    )
+    return target
 
 
 @router.post("/spoof", response_model=Token)

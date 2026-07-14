@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, User, ShoppingCart, Heart, Scan, Store, X, LogIn, LogOut } from 'lucide-react';
+import { Menu, User, ShoppingCart, Heart, Scan, Store, X, LogIn, LogOut, Shield } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
 interface HeaderProps {
   cartItemsCount?: number;
 }
 
-const navItems = [
+const baseNavItems = [
   { to: '/', label: 'Home', icon: Heart, end: true },
   { to: '/profile', label: 'Profile', icon: User },
   { to: '/plans', label: 'Diet Plans', icon: Heart },
@@ -21,6 +21,10 @@ export default function Header({ cartItemsCount = 0 }: HeaderProps) {
   const { isAuthenticated, logout, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
+  const navItems = user?.isAdmin
+    ? [...baseNavItems, { to: '/admin', label: 'Admin', icon: Shield }]
+    : baseNavItems;
 
   const linkClass = (isActive: boolean) =>
     `inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${

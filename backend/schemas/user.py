@@ -69,6 +69,11 @@ class EmailVerificationResend(BaseModel):
     email: EmailStr
 
 
+class UserAdminUpdate(BaseModel):
+    is_active: Optional[bool] = None
+    is_verified: Optional[bool] = None
+
+
 class UserLogin(BaseModel):
     email: EmailStr
     password: str

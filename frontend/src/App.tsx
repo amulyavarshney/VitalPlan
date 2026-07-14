@@ -11,6 +11,8 @@ import FoodScanner from './components/Scanner/FoodScanner';
 import AuthForm from './components/Auth/AuthForm';
 import VerifyEmailPage from './components/Auth/VerifyEmailPage';
 import ProtectedRoute from './components/ProtectedRoute';
+import AdminRoute from './components/AdminRoute';
+import AdminDashboard from './components/Admin/AdminDashboard';
 import { useAuth, getApiErrorMessage } from './hooks/useAuth';
 import { goalsAPI, ordersAPI } from './services/api';
 import type { User, Goal, OrderItem, Order } from './types';
@@ -273,6 +275,14 @@ function AppContent() {
                   onOrderComplete={handleOrderComplete}
                 />
               </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <AdminRoute>
+                <AdminDashboard />
+              </AdminRoute>
             }
           />
           <Route path="*" element={<Navigate to="/" replace />} />
