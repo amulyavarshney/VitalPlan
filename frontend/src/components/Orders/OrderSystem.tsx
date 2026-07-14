@@ -117,7 +117,7 @@ export default function OrderSystem({ cartItems, onUpdateCart, userId, onOrderCo
     onUpdateCart(cartItems.filter((item) => item.id !== itemId));
   };
 
-  const getTotalPrice = () =>
+  const getSubtotal = () =>
     cartItems.reduce((total, item) => total + item.price * item.quantity, 0);
 
   const getTotalItems = () =>
@@ -128,6 +128,10 @@ export default function OrderSystem({ cartItems, onUpdateCart, userId, onOrderCo
     { id: 'walmart' as const, name: 'Walmart Grocery', logo: '🛒', deliveryTime: '1-3 hours', deliveryFee: 3.95 },
     { id: 'local' as const, name: 'Local Stores', logo: '🏪', deliveryTime: '30-60 min', deliveryFee: 2.99 },
   ];
+
+  const deliveryFee = vendors.find((v) => v.id === selectedVendor)?.deliveryFee || 0;
+  const taxAmount = Math.round(getSubtotal() * 0.08 * 100) / 100;
+  const grandTotal = Math.round((getSubtotal() + deliveryFee + taxAmount) * 100) / 100;
 
   const finalizePaidOrder = async (
     orderId: number,
@@ -157,7 +161,7 @@ export default function OrderSystem({ cartItems, onUpdateCart, userId, onOrderCo
     const orderDraft: Omit<Order, 'id' | 'createdAt'> = {
       userId,
       items: cartItems,
-      total: getTotalPrice(),
+      total: grandTotal,
       status: 'pending',
       vendor: selectedVendor,
       deliveryAddress: deliveryAddress.trim(),
@@ -427,30 +431,21 @@ export default function OrderSystem({ cartItems, onUpdateCart, userId, onOrderCo
               <div className="space-y-2 mb-4 pb-4 border-b border-gray-200">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Subtotal</span>
-                  <span className="font-medium">${getTotalPrice().toFixed(2)}</span>
+                  <span className="font-medium">${getSubtotal().toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Delivery Fee</span>
-                  <span className="font-medium">
-                    ${vendors.find((v) => v.id === selectedVendor)?.deliveryFee.toFixed(2)}
-                  </span>
+                  <span className="font-medium">${deliveryFee.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Tax</span>
-                  <span className="font-medium">${(getTotalPrice() * 0.08).toFixed(2)}</span>
+                  <span className="font-medium">${taxAmount.toFixed(2)}</span>
                 </div>
               </div>
 
               <div className="flex justify-between text-lg font-semibold mb-6">
                 <span>Total</span>
-                <span className="text-emerald-600">
-                  $
-                  {(
-                    getTotalPrice() +
-                    (vendors.find((v) => v.id === selectedVendor)?.deliveryFee || 0) +
-                    getTotalPrice() * 0.08
-                  ).toFixed(2)}
-                </span>
+                <span className="text-emerald-600">${grandTotal.toFixed(2)}</span>
               </div>
 
               {pendingPayment && stripeOptions ? (

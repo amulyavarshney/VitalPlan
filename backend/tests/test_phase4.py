@@ -44,7 +44,7 @@ def test_stripe_webhook_marks_order_paid(client, auth_headers, monkeypatch):
                         "type": "supplement",
                     }
                 ],
-                "total": 19.99,
+                "total": 27.58,
                 "vendor": "amazon",
                 "delivery_address": "1 Test Ave",
                 "payment_method": "card",

@@ -1,6 +1,9 @@
 import { useState, type FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { User, Save, AlertCircle, Camera, MapPin } from 'lucide-react';
 import type { User as UserType } from '../../types';
+import { usersAPI, getApiErrorMessage } from '../../services/api';
+import { useAuth } from '../../hooks/useAuth';
 
 interface ProfileFormProps {
   user?: UserType | null;
@@ -20,6 +23,8 @@ const avatarOptions = [
 ];
 
 export default function ProfileForm({ user, onSave, onNext }: ProfileFormProps) {
+  const { logout } = useAuth();
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: user?.name || '',
     email: user?.email || '',
@@ -38,6 +43,8 @@ export default function ProfileForm({ user, onSave, onNext }: ProfileFormProps) 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showAvatarSelector, setShowAvatarSelector] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const dietaryOptions = [
     'Vegetarian', 'Vegan', 'Keto', 'Paleo', 'Mediterranean', 
@@ -436,6 +443,39 @@ export default function ProfileForm({ user, onSave, onNext }: ProfileFormProps) 
             </button>
           </div>
         </form>
+
+        {!onNext && (
+          <div className="mt-8 p-4 border border-red-100 rounded-xl bg-red-50/50">
+            <h3 className="text-sm font-semibold text-red-800 mb-1">Delete account</h3>
+            <p className="text-sm text-red-700 mb-3">
+              Deactivates your account. You will be signed out and unable to log in.
+            </p>
+            {deleteError && <p className="text-sm text-red-600 mb-2">{deleteError}</p>}
+            <button
+              type="button"
+              disabled={isDeleting}
+              onClick={async () => {
+                if (!window.confirm('Delete your VitalPlan account? This cannot be undone from the app.')) {
+                  return;
+                }
+                setIsDeleting(true);
+                setDeleteError(null);
+                try {
+                  await usersAPI.deleteAccount();
+                  logout();
+                  navigate('/');
+                } catch (err) {
+                  setDeleteError(getApiErrorMessage(err, 'Failed to delete account'));
+                } finally {
+                  setIsDeleting(false);
+                }
+              }}
+              className="px-4 py-2 text-sm font-medium text-red-700 border border-red-200 rounded-lg hover:bg-red-100 disabled:opacity-60"
+            >
+              {isDeleting ? 'Deleting...' : 'Delete my account'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

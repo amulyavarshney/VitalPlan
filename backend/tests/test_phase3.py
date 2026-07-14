@@ -12,7 +12,7 @@ def test_create_order_and_pay_demo(client, auth_headers):
                     "type": "supplement",
                 }
             ],
-            "total": 49.99,
+            "total": 59.98,
             "vendor": "amazon",
             "delivery_address": "123 Main Street",
             "payment_method": "card",

@@ -49,3 +49,5 @@ jobs:
         run: npx tsc -p tsconfig.app.json --noEmit
       - name: Lint
         run: npm run lint
+      - name: Build
+        run: npm run build

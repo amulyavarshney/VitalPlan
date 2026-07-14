@@ -12,7 +12,7 @@ def test_create_and_list_orders(client, auth_headers):
                     "type": "supplement",
                 }
             ],
-            "total": 49.99,
+            "total": 59.98,
             "vendor": "amazon",
             "delivery_address": "123 Main Street",
             "payment_method": "card",
@@ -35,7 +35,7 @@ def test_reject_invalid_order_payload(client, auth_headers):
         headers=auth_headers,
         json={
             "items": [],
-            "total": 10,
+            "total": 5.99,
             "vendor": "amazon",
             "delivery_address": "ab",
         },

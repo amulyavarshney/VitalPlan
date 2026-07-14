@@ -1,223 +1,107 @@
 # VitalPlan - AI-Powered Diet Guide
 
-A comprehensive web application that provides personalized diet plans, AI-powered food scanning, and nutrition tracking.
+Personalized diet plans, AI food scanning, marketplace checkout, and nutrition tracking.
 
 ## Architecture
 
-### Frontend (React + TypeScript)
-- **Framework**: React 18 with TypeScript
-- **Build Tool**: Vite
-- **Styling**: Tailwind CSS
-- **PWA**: Progressive Web App with offline capabilities
-- **State Management**: React hooks and context
-- **UI Components**: Custom components with Lucide React icons
-
-### Backend (Python FastAPI)
-- **Framework**: FastAPI with Python 3.11+
-- **Database**: PostgreSQL with SQLAlchemy ORM
-- **Authentication**: JWT tokens with bcrypt password hashing
-- **AI Integration**: Azure OpenAI for diet plan generation and food analysis
-- **Image Processing**: PIL/Pillow for food image analysis
-- **API Documentation**: Auto-generated with Swagger/OpenAPI
+| Layer | Stack |
+|-------|--------|
+| Frontend | React 18, TypeScript, Vite, Tailwind, React Router, Stripe Elements |
+| Backend | FastAPI, SQLAlchemy, Alembic, JWT auth |
+| Data | SQLite (dev) / PostgreSQL (Docker), optional Redis for rate limits |
+| AI | Azure OpenAI / Groq / OpenAI when configured; demo fallbacks otherwise |
 
 ## Features
 
-### 🤖 AI-Powered Features
-- **Personalized Diet Plans**: AI generates custom meal plans based on user goals
-- **Food Image Analysis**: Computer vision analyzes food photos for nutrition info
-- **Smart Recommendations**: AI suggests supplements and foods based on user profile
+- Auth: register/login, refresh tokens, password reset, email verification (required in production)
+- Profile, goals, AI diet plans (persisted), food scanner + Open Food Facts barcodes, scan history
+- Marketplace catalog (DB-backed), cart/checkout with demo or Stripe payments + webhooks
+- Admin dashboard (`/admin`) for products and users
+- PWA installable shell (static asset precache; online API required for core features)
 
-### 📱 Mobile-First Design
-- **Progressive Web App**: Installable on mobile devices
-- **Responsive Design**: Optimized for all screen sizes
-- **Touch-Friendly**: Gesture-based interactions
-- **Offline Support**: Core features work without internet
+## Local development
 
-### 🍎 Nutrition Tracking
-- **Food Scanner**: Camera-based food recognition and analysis
-- **Barcode Scanner**: Quick nutrition lookup via product barcodes
-- **Nutrition Database**: Comprehensive food and supplement information
-- **Meal Planning**: Detailed meal plans with recipes and shopping lists
+### Backend
 
-### 🛒 Marketplace Integration
-- **Supplement Store**: Curated selection of health products
-- **Order Management**: Track purchases and delivery status
-- **Vendor Integration**: Support for multiple suppliers (Amazon, Walmart, local stores)
-
-## Getting Started
-
-### Prerequisites
-- Node.js 18+ and npm
-- Python 3.11+
-- PostgreSQL 13+
-- Redis (optional, for caching)
-
-### Backend Setup
-
-1. **Clone and navigate to backend**:
-   ```bash
-   cd backend
-   ```
-
-2. **Create virtual environment**:
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-
-3. **Install dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Set up environment variables**:
-   ```bash
-   cp .env.example .env
-   # Edit .env with your configuration
-   ```
-
-5. **Set up database**:
-   ```bash
-   # Optional: create PostgreSQL database (SQLite is used by default)
-   createdb vitalplan
-   
-   # Tables are created automatically on startup
-   python main.py
-   ```
-
-6. **Start the API server**:
-   ```bash
-   uvicorn main:app --reload --host 0.0.0.0 --port 8000
-   ```
-
-7. **(Optional) Run database migrations**:
-   ```bash
-   alembic upgrade head
-   ```
-
-8. **Run backend tests**:
-   ```bash
-   pytest -q
-   ```
-
-### Security notes
-- Set a strong `SECRET_KEY` (32+ chars) before production.
-- Set `ENVIRONMENT=production` to enforce secret validation.
-- Admin registration requires `X-Admin-Secret` matching `ADMIN_REGISTRATION_SECRET` (after the first bootstrap admin in development).
-
-### Frontend Setup
-
-1. **Navigate to frontend**:
-   ```bash
-   cd frontend
-   ```
-
-2. **Install dependencies**:
-   ```bash
-   npm install
-   ```
-
-3. **Set up environment variables**:
-   ```bash
-   cp .env.example .env
-   # Edit .env with your API URL
-   ```
-
-4. **Start development server**:
-   ```bash
-   npm run dev
-   ```
-
-### Docker Setup (Alternative)
-
-1. **Start with Docker Compose**:
-   ```bash
-   cd backend
-   docker-compose up -d
-   ```
-
-This will start:
-- FastAPI backend on port 8000
-- PostgreSQL database on port 5432
-- Redis on port 6379
-
-## API Documentation
-
-Once the backend is running, visit:
-- **Swagger UI**: http://localhost:8000/api/docs
-- **ReDoc**: http://localhost:8000/api/redoc
-
-## Key API Endpoints
-
-### Authentication
-- `POST /api/auth/register` - Register new user
-- `POST /api/auth/login` - User login
-- `POST /api/auth/refresh` - Refresh access token
-- `POST /api/auth/password-reset/request` - Request password reset
-- `POST /api/auth/password-reset/confirm` - Confirm password reset
-- `POST /api/auth/token` - OAuth2 token endpoint
-
-### User Management
-- `GET /api/users/me` - Get current user profile
-- `PUT /api/users/me` - Update user profile
-- `DELETE /api/users/me` - Delete user account
-
-### Goals & Diet Plans
-- `GET /api/goals` - Get user goals
-- `POST /api/goals` - Create new goal
-- `POST /api/diet-plans/generate` - Generate AI diet plan
-- `GET /api/diet-plans` - Get user's diet plans
-
-### Food Scanner
-- `POST /api/scanner/analyze-image` - Analyze food image
-- `GET /api/scanner/history` - Get scan history
-- `POST /api/scanner/barcode/{barcode}` - Lookup barcode via Open Food Facts
-
-### Marketplace & Orders
-- `GET /api/marketplace/items` - Get marketplace items
-- `POST /api/marketplace/admin/items` - Create product (admin)
-- `PUT /api/marketplace/admin/items/{id}` - Update product (admin)
-- `POST /api/orders` - Create order + payment intent
-- `POST /api/orders/{id}/pay` - Confirm payment (demo or Stripe)
-- `GET /api/orders` - Get user orders
-
-## Environment Variables
-
-### Backend (.env)
-```env
-DATABASE_URL=postgresql://user:password@localhost/vitalplan
-REDIS_URL=redis://localhost:6379
-SECRET_KEY=your-secret-key
-AZURE_OPENAI_API_KEY=your-azure-openai-key
-AZURE_OPENAI_ENDPOINT=your-azure-endpoint
+```bash
+cd backend
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+alembic upgrade head
+uvicorn main:app --reload --port 8000
+pytest -q
 ```
 
-### Frontend (.env)
-```env
-VITE_API_URL=http://localhost:8000/api
+In development, SQLAlchemy `create_all` can bootstrap tables; **production uses Alembic only** (`entrypoint.sh`).
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+cp .env.example .env   # VITE_API_URL=http://localhost:8000/api
+npm run dev
 ```
 
-## Deployment
+### Docker (dev)
 
-### Backend Deployment
-1. Set up PostgreSQL database
-2. Configure environment variables
-3. Deploy using Docker or cloud platform
-4. Run database migrations
+```bash
+cd backend
+docker compose up -d
+```
 
-### Frontend Deployment
-1. Build the application: `npm run build`
-2. Deploy to static hosting (Netlify, Vercel, etc.)
-3. Configure environment variables for production API
+API `:8000`, Postgres `:5432`, Redis `:6379`.
 
-## Contributing
+## Production-like stack
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests for new functionality
-5. Submit a pull request
+From the repo root:
+
+```bash
+export SECRET_KEY='...at-least-32-chars...'
+export ADMIN_REGISTRATION_SECRET='...at-least-16-chars...'
+export PUBLIC_URL='https://your.domain'
+export ALLOWED_HOSTS='["https://your.domain"]'
+# Recommended for email verification:
+export SMTP_HOST=... SMTP_PORT=587 SMTP_USER=... SMTP_PASSWORD=... SMTP_FROM=...
+# Optional Stripe:
+export STRIPE_SECRET_KEY=... STRIPE_PUBLISHABLE_KEY=... STRIPE_WEBHOOK_SECRET=...
+
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+This runs nginx (`:80`) → frontend + API, Postgres, Redis. Put TLS in front (Cloudflare, Caddy, load balancer). See [docs/STRIPE_WEBHOOKS.md](docs/STRIPE_WEBHOOKS.md).
+
+## Security notes
+
+- `ENVIRONMENT=production` enforces strong `SECRET_KEY` and `ADMIN_REGISTRATION_SECRET`
+- Email verification is always required in production; configure SMTP
+- Admin registration uses `X-Admin-Secret` after the first bootstrap admin in development
+- Order totals are computed server-side (subtotal + vendor delivery fee + 8% tax)
+
+## Key API endpoints
+
+### Auth
+- `POST /api/auth/register` · `POST /api/auth/login` · `POST /api/auth/refresh`
+- `POST /api/auth/verify-email` · `POST /api/auth/verify-email/resend`
+- `POST /api/auth/password-reset/request` · `POST /api/auth/password-reset/confirm`
+
+### Users / admin
+- `GET|PUT|DELETE /api/users/me`
+- `GET /api/admin/users` · `PATCH /api/admin/users/{id}`
+- Marketplace admin CRUD under `/api/marketplace/admin/items`
+
+### Plans / scanner / orders
+- `POST /api/diet-plans/generate` · `GET /api/diet-plans`
+- `POST /api/scanner/analyze-image` · `GET /api/scanner/history` · `POST /api/scanner/barcode/{barcode}`
+- `POST /api/orders` · `POST /api/orders/{id}/pay` · `GET /api/orders`
+- `POST /api/webhooks/stripe` (Stripe signature; see webhook docs)
+- `GET /api/health` (DB + Redis probes)
+
+## Environment variables
+
+See `backend/.env.example` and `frontend/.env.example` for the full list (SMTP, Stripe, AI keys, Redis, uploads).
 
 ## License
 
-This project is licensed under the MIT License.
+MIT

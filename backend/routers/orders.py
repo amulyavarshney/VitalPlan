@@ -6,6 +6,7 @@ from services.database import get_db
 from services.auth_service import get_current_user
 from services.payment_service import create_payment_intent, confirm_payment, payment_public_config
 from services.order_payment import apply_payment_result
+from services.order_pricing import compute_order_totals, totals_match
 from models.user import User
 from models.order import Order
 from schemas.order import (
@@ -33,11 +34,22 @@ async def create_order(
     db: Session = Depends(get_db),
 ):
     """Create a new order and initialize payment."""
+    pricing = compute_order_totals(items=order_data.items, vendor=order_data.vendor)
+    if not totals_match(order_data.total, pricing["total"]):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Order total mismatch. Expected {pricing['total']:.2f} "
+                f"(subtotal {pricing['subtotal']:.2f} + delivery {pricing['delivery_fee']:.2f} "
+                f"+ tax {pricing['tax']:.2f}), got {order_data.total:.2f}"
+            ),
+        )
+
     try:
         db_order = Order(
             user_id=current_user.id,
             items=[item.model_dump() for item in order_data.items],
-            total=order_data.total,
+            total=pricing["total"],
             vendor=order_data.vendor,
             delivery_address=order_data.delivery_address,
             payment_method=order_data.payment_method,
@@ -50,7 +62,7 @@ async def create_order(
         db.refresh(db_order)
 
         payment = await create_payment_intent(
-            amount=order_data.total,
+            amount=pricing["total"],
             order_id=db_order.id,
             customer_email=current_user.email,
         )
