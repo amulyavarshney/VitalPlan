@@ -1,0 +1,50 @@
+version: "3.8"
+
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql://postgres:password@db:5432/vitalplan
+      REDIS_URL: redis://redis:6379
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY}
+      ADMIN_REGISTRATION_SECRET: ${ADMIN_REGISTRATION_SECRET:?Set ADMIN_REGISTRATION_SECRET}
+      ALLOWED_HOSTS: '["https://your-frontend.example"]'
+      UPLOAD_DIR: /app/uploads
+      FRONTEND_URL: ${FRONTEND_URL:-https://your-frontend.example}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - upload_data:/app/uploads
+    restart: unless-stopped
+
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: vitalplan
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d vitalplan"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  upload_data:

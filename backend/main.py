@@ -12,6 +12,7 @@ from routers import auth, users, goals, diet_plans, marketplace, scanner, orders
 from config import settings
 from services.database import engine, Base
 from services.storage_service import resolve_upload_path
+from services.health_service import build_health_report
 import models.user  # noqa: F401
 import models.goal  # noqa: F401
 import models.diet_plan  # noqa: F401
@@ -25,12 +26,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-Base.metadata.create_all(bind=engine)
+# Dev/test convenience only — production relies on Alembic via entrypoint.sh
+if settings.ENVIRONMENT != "production":
+    Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="VitalPlan API",
     description="AI-Powered Diet Guide and Nutrition Tracker Backend",
-    version="1.1.0",
+    version="1.2.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
 )
@@ -52,6 +55,20 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         return response
 
 
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "camera=(self), microphone=(), geolocation=()"
+        response.headers["X-XSS-Protection"] = "0"
+        if settings.ENVIRONMENT == "production":
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        return response
+
+
+app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(
     CORSMiddleware,
@@ -129,19 +146,25 @@ async def serve_upload(subdir: str, filename: str):
 
 @app.get("/api/health")
 async def health_check():
-    """Health check endpoint with light diagnostics"""
-    return {
-        "status": "healthy",
-        "message": "VitalPlan API is running",
-        "environment": settings.ENVIRONMENT,
-        "version": "1.1.0",
-        "features": {
-            "refresh_tokens": True,
-            "barcode_lookup": True,
-            "marketplace_db": True,
-            "image_uploads": True,
+    """Readiness-style health check with database and Redis probes."""
+    report = build_health_report()
+    status_code = status.HTTP_200_OK if report["status"] != "unhealthy" else status.HTTP_503_SERVICE_UNAVAILABLE
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            **report,
+            "environment": settings.ENVIRONMENT,
+            "version": "1.2.0",
+            "features": {
+                "refresh_tokens": True,
+                "barcode_lookup": True,
+                "marketplace_db": True,
+                "image_uploads": True,
+                "stripe_webhooks": True,
+                "redis_rate_limits": True,
+            },
         },
-    }
+    )
 
 
 @app.get("/api/")
@@ -149,7 +172,7 @@ async def root():
     """Root endpoint"""
     return {
         "message": "Welcome to VitalPlan API",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "docs": "/api/docs",
     }
 

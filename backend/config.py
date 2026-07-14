@@ -28,8 +28,8 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "sqlite:///./vitalplan.db"
     
-    # Redis
-    REDIS_URL: str = "redis://localhost:6379"
+    # Redis (optional — leave empty to disable; rate limits fall back to memory)
+    REDIS_URL: str = ""
     
     # CORS
     ALLOWED_HOSTS: List[str] = ["http://localhost:3000", "http://localhost:5173"]
