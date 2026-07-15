@@ -53,6 +53,21 @@ docker compose up -d
 
 API `:8000`, Postgres `:5432`, Redis `:6379`.
 
+## Live deploy (GitHub Pages + Render API)
+
+| | URL |
+|--|-----|
+| App | https://amulyavarshney.github.io/VitalPlan/ |
+| API + **Swagger** | https://vitalplan-api.onrender.com/api/docs |
+
+GitHub Pages hosts the SPA only (static). The FastAPI backend (including Swagger UI) runs on Render — see [docs/DEPLOY.md](docs/DEPLOY.md).
+
+```bash
+# After connecting render.yaml on Render, set GitHub Actions variable:
+#   VITE_API_URL=https://<your-service>.onrender.com/api
+# Then push to main (or run "Deploy GitHub Pages" workflow).
+```
+
 ## Production-like stack
 
 From the repo root:
@@ -95,6 +110,14 @@ Covers register/login, onboarding, diet plans, marketplace, demo checkout, scann
 - Production logging defaults to JSON (`LOG_FORMAT=auto`)
 - Admin audit log (`GET /api/admin/audit`), logout token revocation (`POST /api/auth/logout`), Prometheus `/metrics`
 - Local uploads require signed URLs; account delete purges scan images
+
+## Swagger / OpenAPI
+
+With the API running locally or on Render:
+
+- Swagger UI: `/api/docs` (alias `/docs`)
+- ReDoc: `/api/redoc`
+- Schema: `/api/openapi.json`
 
 ## Key API endpoints
 

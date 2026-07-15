@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:pages": "VITE_BASE=/VitalPlan/ vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "test:e2e": "playwright test",

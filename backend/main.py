@@ -1,7 +1,7 @@
 from typing import Optional
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, RedirectResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -46,12 +46,26 @@ if settings.SENTRY_DSN:
 if settings.ENVIRONMENT != "production":
     Base.metadata.create_all(bind=engine)
 
+API_DESCRIPTION = """
+AI-powered diet guide and nutrition tracker API.
+
+### Interactive docs
+- **Swagger UI**: [`/api/docs`](/api/docs) (also [`/docs`](/docs))
+- **ReDoc**: [`/api/redoc`](/api/redoc)
+- **OpenAPI JSON**: [`/api/openapi.json`](/api/openapi.json)
+
+### Auth
+Most endpoints require `Authorization: Bearer <access_token>` from `/api/auth/login`.
+"""
+
 app = FastAPI(
     title="VitalPlan API",
-    description="AI-Powered Diet Guide and Nutrition Tracker Backend",
+    description=API_DESCRIPTION,
     version="1.6.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json",
+    swagger_ui_parameters={"persistAuthorization": True},
 )
 
 
@@ -84,10 +98,26 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"] = "camera=(self), microphone=(), geolocation=()"
         response.headers["X-XSS-Protection"] = "0"
-        # API responses are JSON; keep CSP tight and block framing.
-        response.headers["Content-Security-Policy"] = (
-            "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
-        )
+        path = request.url.path
+        # Swagger/ReDoc need scripts & CDN assets; keep JSON API responses locked down.
+        if path.startswith(("/api/docs", "/api/redoc", "/docs", "/redoc")) or path in {
+            "/api/openapi.json",
+            "/openapi.json",
+        }:
+            response.headers["Content-Security-Policy"] = (
+                "default-src 'self'; "
+                "img-src 'self' data: https:; "
+                "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                "font-src 'self' data: https://cdn.jsdelivr.net; "
+                "connect-src 'self'; "
+                "frame-ancestors 'none'; "
+                "base-uri 'self'"
+            )
+        else:
+            response.headers["Content-Security-Policy"] = (
+                "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+            )
         if settings.ENVIRONMENT == "production":
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         return response
@@ -223,6 +253,18 @@ async def health_check():
     )
 
 
+@app.get("/docs", include_in_schema=False)
+async def swagger_redirect():
+    """Convenience alias for Swagger UI."""
+    return RedirectResponse(url="/api/docs")
+
+
+@app.get("/redoc", include_in_schema=False)
+async def redoc_redirect():
+    """Convenience alias for ReDoc."""
+    return RedirectResponse(url="/api/redoc")
+
+
 @app.get("/api/")
 async def root():
     """Root endpoint"""
@@ -230,6 +272,8 @@ async def root():
         "message": "Welcome to VitalPlan API",
         "version": "1.6.0",
         "docs": "/api/docs",
+        "redoc": "/api/redoc",
+        "openapi": "/api/openapi.json",
     }
 
 

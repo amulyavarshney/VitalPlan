@@ -2,11 +2,18 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
+// GitHub Pages project site: https://amulyavarshney.github.io/VitalPlan/
+const base = process.env.VITE_BASE || '/';
+// Workbox/terser can flake in CI; Pages still works without a service worker.
+const disablePwa = process.env.VITE_DISABLE_PWA === '1' || Boolean(process.env.VITE_BASE);
+
 // https://vitejs.dev/config/
 export default defineConfig({
+  base,
   plugins: [
     react(),
     VitePWA({
+      disable: disablePwa,
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {
@@ -17,8 +24,8 @@ export default defineConfig({
         background_color: '#ffffff',
         display: 'standalone',
         orientation: 'portrait',
-        scope: '/',
-        start_url: '/',
+        scope: base,
+        start_url: base,
         icons: [
           {
             src: 'pwa-192x192.png',

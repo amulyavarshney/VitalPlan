@@ -149,9 +149,14 @@ def create_email_verification_token(email: str) -> str:
 
 
 def email_verification_required() -> bool:
-    """Production always requires verification; otherwise honor the config flag."""
+    """Require email verification in production when SMTP is configured.
+
+    Public demos without SMTP auto-verify so registration remains usable.
+    """
     if settings.ENVIRONMENT == "production":
-        return True
+        if settings.SMTP_HOST:
+            return True
+        return bool(settings.EMAIL_VERIFICATION_REQUIRED)
     return bool(settings.EMAIL_VERIFICATION_REQUIRED)
 
 
