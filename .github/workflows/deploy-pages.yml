@@ -33,11 +33,10 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - name: Install dependencies
-        run: npm ci --legacy-peer-deps
+        run: npm ci --registry=https://registry.npmjs.org/
       - name: Build for GitHub Pages
         env:
           VITE_BASE: /VitalPlan/
-          VITE_DISABLE_PWA: "1"
           VITE_API_URL: ${{ inputs.api_url || vars.VITE_API_URL || 'https://vitalplan-api.onrender.com/api' }}
         run: npm run build
       - name: Upload Pages artifact

@@ -17,7 +17,7 @@ Personalized diet plans, AI food scanning, marketplace checkout, and nutrition t
 - Profile, goals, AI diet plans (persisted), food scanner + Open Food Facts barcodes, scan history
 - Marketplace catalog (DB-backed), cart/checkout with demo or Stripe payments + webhooks
 - Admin dashboard (`/admin`) for products and users
-- PWA installable shell (static asset precache; online API required for core features)
+- Swagger UI on the API at `/api/docs`
 
 ## Local development
 
