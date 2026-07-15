@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const API_URL = process.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
+const API_URL = process.env.VITE_API_URL || 'http://127.0.0.1:8001/api';
 
 test.describe('API-backed checkout', () => {
   test('register, create demo order, pay, and see history', async ({ request }) => {

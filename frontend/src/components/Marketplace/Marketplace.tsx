@@ -56,41 +56,41 @@ export default function Marketplace({ onAddToCart }: MarketplaceProps) {
   };
 
   return (
-    <div className="max-w-7xl mx-auto p-6">
+    <div className="max-w-7xl mx-auto p-4 sm:p-6 overflow-x-hidden">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Premium Health Marketplace</h1>
-        <p className="text-gray-600">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Premium Health Marketplace</h1>
+        <p className="text-gray-600 text-sm sm:text-base">
           Discover high-quality supplements, superfoods, and organic products from trusted brands
         </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <div className="flex items-center p-4 bg-emerald-50 rounded-xl">
-          <Shield className="w-8 h-8 text-emerald-600 mr-3" />
-          <div>
+        <div className="flex items-center p-4 bg-emerald-50 rounded-xl min-w-0">
+          <Shield className="w-8 h-8 text-emerald-600 mr-3 flex-shrink-0" />
+          <div className="min-w-0">
             <div className="font-semibold text-gray-900">Quality Guaranteed</div>
             <div className="text-sm text-gray-600">Third-party tested products</div>
           </div>
         </div>
-        <div className="flex items-center p-4 bg-blue-50 rounded-xl">
-          <Truck className="w-8 h-8 text-blue-600 mr-3" />
-          <div>
+        <div className="flex items-center p-4 bg-blue-50 rounded-xl min-w-0">
+          <Truck className="w-8 h-8 text-blue-600 mr-3 flex-shrink-0" />
+          <div className="min-w-0">
             <div className="font-semibold text-gray-900">Fast Delivery</div>
             <div className="text-sm text-gray-600">Same-day available</div>
           </div>
         </div>
-        <div className="flex items-center p-4 bg-purple-50 rounded-xl">
-          <Package className="w-8 h-8 text-purple-600 mr-3" />
-          <div>
+        <div className="flex items-center p-4 bg-purple-50 rounded-xl min-w-0">
+          <Package className="w-8 h-8 text-purple-600 mr-3 flex-shrink-0" />
+          <div className="min-w-0">
             <div className="font-semibold text-gray-900">Curated Selection</div>
             <div className="text-sm text-gray-600">Expert-reviewed products</div>
           </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-lg p-6 mb-8">
+      <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6 mb-8">
         <div className="flex flex-col lg:flex-row gap-4">
-          <div className="flex-1 relative">
+          <div className="flex-1 relative min-w-0">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
               type="text"
@@ -100,11 +100,11 @@ export default function Marketplace({ onAddToCart }: MarketplaceProps) {
               className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
             />
           </div>
-          <div className="flex gap-4">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 min-w-0">
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              className="w-full sm:w-auto min-w-0 px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
             >
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>
@@ -115,7 +115,7 @@ export default function Marketplace({ onAddToCart }: MarketplaceProps) {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              className="w-full sm:w-auto min-w-0 px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
             >
               <option value="featured">Featured</option>
               <option value="price-low">Price: Low to High</option>

@@ -31,8 +31,13 @@ class Settings(BaseSettings):
     # Redis (optional — leave empty to disable; rate limits fall back to memory)
     REDIS_URL: str = ""
     
-    # CORS
-    ALLOWED_HOSTS: List[str] = ["http://localhost:3000", "http://localhost:5173"]
+    # CORS (include both localhost and 127.0.0.1 for Vite/Playwright)
+    ALLOWED_HOSTS: List[str] = [
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:5173",
+    ]
 
     # Uploads (local disk; optional S3 when S3_BUCKET + keys set)
     UPLOAD_DIR: str = "./uploads"

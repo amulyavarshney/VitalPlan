@@ -4,7 +4,7 @@ test.describe('VitalPlan smoke', () => {
   test('home page shows brand and get started', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByText('VitalPlan').first()).toBeVisible();
-    await expect(page.getByRole('button', { name: /get started/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /start your journey/i })).toBeVisible();
   });
 
   test('login route renders auth form', async ({ page }) => {

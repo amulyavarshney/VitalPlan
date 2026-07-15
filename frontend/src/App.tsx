@@ -218,7 +218,7 @@ function AppContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 overflow-x-hidden">
       <SpoofBanner />
       <Header cartItemsCount={getCartItemsCount()} />
       {statusMessage && (
@@ -228,7 +228,7 @@ function AppContent() {
           </div>
         </div>
       )}
-      <main>
+      <main className="overflow-x-hidden">
         <Suspense fallback={<RouteFallback />}>
           <Routes>
             <Route path="/" element={<Hero onGetStarted={handleGetStarted} />} />

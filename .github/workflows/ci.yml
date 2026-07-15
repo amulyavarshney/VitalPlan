@@ -65,8 +65,10 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: E2E smoke + checkout
         env:
-          VITE_API_URL: http://127.0.0.1:8000/api
+          VITE_API_URL: http://127.0.0.1:8001/api
+          E2E_API_PORT: "8001"
           E2E_START_API: "1"
+          E2E_DISABLE_RATE_LIMIT: "1"
           ENVIRONMENT: development
           SECRET_KEY: ci-e2e-secret-key-not-for-production-use
           DATABASE_URL: sqlite:///./e2e.db

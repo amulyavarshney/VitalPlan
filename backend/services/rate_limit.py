@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import time
 from collections import defaultdict, deque
 from typing import Deque, Dict
@@ -11,6 +12,9 @@ from fastapi import HTTPException, Request, status
 from config import settings
 
 logger = logging.getLogger(__name__)
+
+# Used by Playwright/local E2E so parallel registrations are not blocked.
+_RATE_LIMITS_DISABLED = os.getenv("E2E_DISABLE_RATE_LIMIT", "").lower() in {"1", "true", "yes"}
 
 _redis_client = None
 _redis_checked = False
@@ -63,6 +67,8 @@ class RateLimiter:
         self._hits.clear()
 
     def check(self, key: str) -> None:
+        if _RATE_LIMITS_DISABLED:
+            return
         redis_client = get_redis_client()
         if redis_client is not None:
             self._check_redis(redis_client, key)

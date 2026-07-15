@@ -67,9 +67,11 @@ export default function Header({ cartItemsCount = 0 }: HeaderProps) {
               })}
               {isAuthenticated ? (
                 <button
+                  type="button"
                   onClick={() => {
-                    logout();
-                    navigate('/');
+                    // Leave protected routes before clearing auth to avoid /login bounce.
+                    navigate('/', { replace: true });
+                    window.setTimeout(() => logout(), 0);
                   }}
                   className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-600 hover:text-emerald-600"
                   title={user?.email}
@@ -94,6 +96,9 @@ export default function Header({ cartItemsCount = 0 }: HeaderProps) {
 
             <div className="lg:hidden">
               <button
+                type="button"
+                aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
+                aria-expanded={isMenuOpen}
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
                 className="inline-flex items-center justify-center p-2 rounded-md text-gray-600 hover:text-emerald-600 hover:bg-gray-50"
               >
@@ -142,14 +147,15 @@ export default function Header({ cartItemsCount = 0 }: HeaderProps) {
                 );
               })}
               <button
+                type="button"
                 onClick={() => {
+                  setIsMenuOpen(false);
                   if (isAuthenticated) {
-                    logout();
-                    navigate('/');
+                    navigate('/', { replace: true });
+                    window.setTimeout(() => logout(), 0);
                   } else {
                     navigate('/login');
                   }
-                  setIsMenuOpen(false);
                 }}
                 className="w-full flex items-center px-6 py-4 text-base font-medium text-gray-600 hover:text-emerald-600 hover:bg-gray-50"
               >

@@ -79,7 +79,9 @@ docker compose -f docker-compose.prod.yml -f docker-compose.tls.yml up -d --buil
 
 Optional: `SENTRY_DSN` / `VITE_SENTRY_DSN`, S3 upload vars (`S3_BUCKET`, …). Stripe webhooks: [docs/STRIPE_WEBHOOKS.md](docs/STRIPE_WEBHOOKS.md).
 
-Frontend E2E smoke: `cd frontend && npm run test:e2e`.
+Frontend E2E (API + UI): `cd frontend && E2E_START_API=1 npm run test:e2e`.
+
+Covers register/login, onboarding, diet plans, marketplace, demo checkout, scanner upload, mobile nav/overflow, and API checkout. Playwright starts the API on port `8001` by default so it won’t collide with a local `:8000` server.
 
 ## Security notes
 
